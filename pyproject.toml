@@ -9,6 +9,21 @@ description = "A liberated, self-hostable, provider-agnostic AI agent with Tor-i
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
+authors = [{ name = "OpenOnion contributors" }]
+keywords = ["ai-agent", "llm", "tor", "onion", "privacy", "self-hosted", "playwright", "fastapi", "anthropic", "ollama"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: Proxy Servers",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Security",
+]
 dependencies = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.29",
@@ -17,6 +32,12 @@ dependencies = [
   "aiosqlite>=0.19",
   "httpx>=0.27",
 ]
+
+[project.urls]
+Homepage = "https://github.com/brandononchain/openonion"
+Documentation = "https://github.com/brandononchain/openonion/tree/main/docs"
+Issues = "https://github.com/brandononchain/openonion/issues"
+Changelog = "https://github.com/brandononchain/openonion/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 postgres = ["asyncpg>=0.29"]
