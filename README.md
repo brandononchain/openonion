@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://github.com/brandononchain/openonion">
-  <img src=".github/assets/banner.svg" alt="OpenOnion: the liberated AI agent with Tor-isolated browsing" width="100%">
+  <img src=".github/assets/banner.png" alt="OpenOnion: the liberated AI agent" width="100%">
 </a>
 
 <h3>An open-source AI agent you host yourself, point at any model, and watch while it browses the web over Tor.</h3>
@@ -262,13 +262,14 @@ openonion/
 │   ├── browser/        # Playwright service + Tor port pool & control client
 │   ├── memory/         # async SQLAlchemy store (SQLite / Postgres)
 │   ├── api/            # FastAPI app: REST, SSE replay, export, auth
-│   ├── web/            # dependency-free single-file UI
+│   ├── web/            # dependency-free single-file UI + favicons
 │   ├── policy.py       # SessionPolicy + PolicyEngine
 │   ├── events.py       # event types + fan-out bus
 │   └── cli.py          # `openonion` command
 ├── infra/docker/tor/   # hardened Tor sidecar image
 ├── tests/              # pytest suite
 ├── docs/               # architecture + Tor threat model
+├── brand/              # logos, icons, social banners, usage guide
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -302,6 +303,10 @@ Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 > Tor is **IP-anonymized, not anonymous**. Read the [threat model](docs/tor-threat-model.md) before relying on it.
 
 Found a vulnerability? Please report it privately. See [SECURITY.md](SECURITY.md).
+
+## 🎨 Brand
+
+Logos, icons, social banners, colors and usage rules live in [`brand/`](brand/README.md).
 
 ## 📄 License
 

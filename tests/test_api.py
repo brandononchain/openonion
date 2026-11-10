@@ -69,6 +69,11 @@ async def test_session_lifecycle_and_sse_replay(settings):
         assert (await client.post(f"/api/sessions/{sid}/approvals/nope", json={"approved": True})).status_code == 404
         assert (await client.get("/api/sessions/does-not-exist")).status_code == 404
         assert "OpenOnion" in (await client.get("/")).text
+        icon = await client.get("/favicon.svg")
+        assert icon.status_code == 200 and icon.headers["content-type"].startswith("image/svg+xml")
+        assert (await client.get("/favicon.ico")).status_code == 200
+        assert (await client.get("/apple-touch-icon.png")).headers["content-type"] == "image/png"
+        assert (await client.get("/secrets.txt")).status_code == 404
     finally:
         await client.aclose()
         await ctx.__aexit__(None, None, None)

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .. import __version__
@@ -217,5 +217,15 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def index():
         return resources.files("openonion.web").joinpath("index.html").read_text(encoding="utf-8")
+
+    _brand_files = {"favicon.svg": "image/svg+xml", "favicon.ico": "image/x-icon",
+                    "apple-touch-icon.png": "image/png"}
+
+    @app.get("/{name}", include_in_schema=False)
+    async def brand_asset(name: str):
+        if name not in _brand_files:
+            raise HTTPException(404)
+        data = resources.files("openonion.web").joinpath(name).read_bytes()
+        return Response(data, media_type=_brand_files[name], headers={"Cache-Control": "public, max-age=86400"})
 
     return app
