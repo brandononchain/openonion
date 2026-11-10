@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenOnion</title>
+<style>
+  :root {
+    --bg: #f6f5f8; --panel: #ffffff; --ink: #1d1a22; --muted: #6f6878; --line: #e4e0ea;
+    --accent: #6b3fa0; --accent-ink: #ffffff; --accent-soft: #efe7f8;
+    --ok: #1f7a4d; --ok-soft: #e3f3ea; --bad: #b3261e; --bad-soft: #fbe7e5;
+    --warn: #8a5a00; --warn-soft: #fff2d6; --tor: #4a2a73; --code: #f1eef5;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121016; --panel: #1b1820; --ink: #ebe7f0; --muted: #9a92a6; --line: #2d2834;
+      --accent: #a77ee0; --accent-ink: #120e17; --accent-soft: #2a2036;
+      --ok: #5fc58f; --ok-soft: #16281f; --bad: #f08a80; --bad-soft: #2e1918;
+      --warn: #e7b85a; --warn-soft: #2c2312; --tor: #c9a8f2; --code: #221e28;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line);
+           background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+  header .meta { color: var(--muted); font-size: 12px; margin-left: auto; text-align: right; }
+  .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px; min-height: calc(100vh - 53px); }
+  aside, .side { background: var(--panel); border-right: 1px solid var(--line); padding: 14px; overflow-y: auto; }
+  .side { border-right: 0; border-left: 1px solid var(--line); }
+  main { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 6px 0 8px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  textarea, input, select { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  textarea { resize: vertical; min-height: 84px; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); margin-top: 8px; }
+  .check input { width: auto; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .sessions { list-style: none; padding: 0; margin: 0; }
+  .sessions li { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
+  .sessions li:hover { background: var(--accent-soft); }
+  .sessions li.active { background: var(--accent-soft); font-weight: 600; }
+  .sessions .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--code); color: var(--muted); white-space: nowrap; }
+  .pill.running { background: var(--warn-soft); color: var(--warn); }
+  .pill.completed { background: var(--ok-soft); color: var(--ok); }
+  .pill.failed, .pill.cancelled { background: var(--bad-soft); color: var(--bad); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .card .head { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .card .head b { color: var(--ink); font-weight: 600; }
+  .card.assistant { border-left: 3px solid var(--accent); }
+  .card.ok { border-left: 3px solid var(--ok); }
+  .card.err { border-left: 3px solid var(--bad); }
+  .card.approval { border: 1px solid var(--warn); background: var(--warn-soft); }
+  .card.final { border: 1px solid var(--ok); }
+  .card.goal { background: var(--accent-soft); border-color: transparent; }
+  .body { margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+  pre { margin: 6px 0 0; padding: 8px 10px; background: var(--code); border-radius: 8px; font: 12px/1.45 var(--mono);
+        white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .shot { margin-top: 8px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+  .tor { color: var(--tor); font-weight: 600; }
+  .plan { list-style: none; padding: 0; margin: 0; }
+  .plan li { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .plan .ic { width: 18px; text-align: center; flex: none; }
+  .plan .done { color: var(--muted); text-decoration: line-through; }
+  .stats { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+  .composer { position: sticky; bottom: 0; background: var(--bg); padding-top: 8px; margin-top: auto; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr; }
+    aside, .side { border: 0; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧅 OpenOnion</h1>
+  <span class="pill" id="health">connecting…</span>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>New session</h2>
+    <form id="newForm">
+      <label for="goal">Goal</label>
+      <textarea id="goal" required placeholder="e.g. Visit the Tor Project's onion site and summarize what's new"></textarea>
+      <label for="network">Network</label>
+      <select id="network">
+        <option value="both">Clearnet + Tor</option>
+        <option value="tor">Tor only</option>
+        <option value="clearnet">Clearnet only</option>
+        <option value="off">Offline (no network tools)</option>
+      </select>
+      <div class="check"><input type="checkbox" id="approveWrites" checked><label for="approveWrites" style="margin:0;color:inherit">Ask before writing files / running shell</label></div>
+      <div class="check"><input type="checkbox" id="js" checked><label for="js" style="margin:0;color:inherit">Allow JavaScript in browsers</label></div>
+      <div class="row" style="margin-top:12px"><button class="primary" type="submit" style="flex:1">Start</button></div>
+    </form>
+    <h2 style="margin-top:22px">Sessions</h2>
+    <ul class="sessions" id="sessions"></ul>
+  </aside>
+
+  <main id="main">
+    <div class="empty" id="empty">Start a session or pick one on the left.<br><span class="muted">Every thought, tool call and result streams here live and is saved to the event log.</span></div>
+    <div id="timeline" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div class="composer" id="composer" hidden>
+      <div class="row">
+        <input id="followup" placeholder="Follow-up goal for this session…">
+        <button class="primary" id="sendFollowup">Run</button>
+        <button class="danger" id="cancelBtn">Stop</button>
+      </div>
+    </div>
+  </main>
+
+  <section class="side">
+    <h2>Plan</h2>
+    <ul class="plan" id="plan"><li class="muted">No plan yet.</li></ul>
+    <h2 style="margin-top:20px">Run</h2>
+    <div class="stats" id="stats"><span>—</span><span></span></div>
+    <h2 style="margin-top:20px">Session</h2>
+    <div class="row" style="flex-wrap:wrap">
+      <button id="exportBtn" disabled>Export log</button>
+    </div>
+    <p class="muted" id="policyNote"></p>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = "";
+try { token = localStorage.getItem("openonion_token") || ""; } catch (_) {}
+let current = null, source = null, stats = {};
+
+function headers() { return token ? { Authorization: "Bearer " + token } : {}; }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...headers(), ...(opts.headers || {}) } });
+  if (res.status === 401) {
+    token = prompt("API token") || "";
+    try { localStorage.setItem("openonion_token", token); } catch (_) {}
+    return api(path, opts);
+  }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function el(html) { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; }
+function art(url) { return token ? url + "?token=" + encodeURIComponent(token) : url; }
+
+async function health() {
+  try {
+    const h = await api("/api/health");
+    $("health").textContent = "online"; $("health").className = "pill completed";
+    $("meta").innerHTML = `${esc(h.provider)} · ${esc(h.model || "no model set")}<br>${h.tor_slots} Tor slots · shell ${h.shell_enabled ? "on" : "off"}`;
+  } catch (e) { $("health").textContent = "offline"; $("health").className = "pill failed"; }
+}
+
+async function loadSessions() {
+  const list = await api("/api/sessions");
+  $("sessions").innerHTML = "";
+  for (const s of list) {
+    const li = el(`<li class="${current === s.id ? "active" : ""}"><span class="t">${esc(s.title)}</span><span class="pill ${esc(s.status)}">${esc(s.status)}</span></li>`);
+    li.onclick = () => openSession(s.id);
+    $("sessions").appendChild(li);
+  }
+}
+
+function resetView() {
+  $("timeline").innerHTML = ""; $("plan").innerHTML = '<li class="muted">No plan yet.</li>';
+  stats = { steps: 0, tools: 0, tokens: 0, artifacts: 0, status: "—" }; renderStats();
+}
+function renderStats() {
+  $("stats").innerHTML = Object.entries({ Status: stats.status, Steps: stats.steps, "Tool calls": stats.tools,
+    Tokens: stats.tokens.toLocaleString(), Artifacts: stats.artifacts })
+    .map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join("");
+}
+
+async function openSession(id) {
+  current = id; if (source) source.close();
+  $("empty").hidden = true; $("composer").hidden = false; $("exportBtn").disabled = false;
+  resetView(); loadSessions();
+  const s = await api(`/api/sessions/${id}`);
+  const p = s.settings.policy || {};
+  $("policyNote").textContent = `Network: ${p.network} · approvals: ${(p.approval_required || []).join(", ") || "none"} · max ${p.max_steps} steps`;
+  const url = `/api/sessions/${id}/stream` + (token ? `?token=${encodeURIComponent(token)}` : "");
+  source = new EventSource(url);
+  source.onmessage = (m) => render(JSON.parse(m.data));
+}
+
+const icons = { done: "✔", in_progress: "▶", failed: "✖", skipped: "–", pending: "○" };
+function render(ev) {
+  const p = ev.payload, tl = $("timeline");
+  const add = (node) => { tl.appendChild(node); node.scrollIntoView({ block: "end", behavior: "smooth" }); };
+  switch (ev.type) {
+    case "run_started":
+      stats.status = "running"; renderStats();
+      add(el(`<div class="card goal"><div class="head"><b>Goal</b><span>${esc(p.provider)} / ${esc(p.model)} · network: ${esc(p.policy.network)}</span></div><div class="body">${esc(p.goal)}</div></div>`));
+      break;
+    case "assistant_message": {
+      stats.steps = p.step; renderStats();
+      const short = (o) => { const s = JSON.stringify(o); return s.length > 220 ? s.slice(0, 220) + "…" : s; };
+      const calls = (p.tool_calls || []).map(tc => `<div class="muted">→ <b class="${tc.name.startsWith("tor") ? "tor" : ""}">${esc(tc.name)}</b> <code>${esc(short(tc.arguments))}</code></div>`).join("");
+      if (!p.text && !calls) break;
+      add(el(`<div class="card assistant"><div class="head"><b>Step ${p.step}</b><span>thinking</span></div>${p.text ? `<div class="body">${esc(p.text)}</div>` : ""}${calls}</div>`));
+      break;
+    }
+    case "plan_updated":
+      $("plan").innerHTML = p.steps.map(s => `<li><span class="ic">${icons[s.status] || "○"}</span><span class="${s.status === "done" ? "done" : ""}">${esc(s.description)}</span></li>`).join("");
+      break;
+    case "tool_finished": {
+      stats.tools++; renderStats();
+      if (p.tool === "update_plan") break;
+      const via = p.data && p.data.via ? ` · <span class="${p.data.via.startsWith("tor") ? "tor" : ""}">${esc(p.data.via)}</span>` : "";
+      const node = el(`<div class="card ${p.ok ? "ok" : "err"}" id="call-${esc(p.call_id)}"><div class="head"><b>${esc(p.tool)}</b><span>${p.ok ? "ok" : "error"} · ${p.duration_ms} ms${via}</span></div><details ${p.ok ? "" : "open"}><summary>result${p.truncated ? " (truncated)" : ""}</summary><pre>${esc(p.preview)}</pre></details></div>`);
+      add(node);
+      break;
+    }
+    case "artifact_created": {
+      stats.artifacts++; renderStats();
+      const host = document.getElementById("call-" + p.metadata.call_id) || $("timeline").lastElementChild;
+      if (p.mime.startsWith("image/") && host) host.appendChild(el(`<a href="${art(p.url)}" target="_blank" rel="noopener"><img class="shot" src="${art(p.url)}" alt="screenshot of ${esc(p.metadata.url || "")}"></a>`));
+      break;
+    }
+    case "policy_denied":
+      add(el(`<div class="card err"><div class="head"><b>Blocked by policy</b><span>${esc(p.tool)}</span></div><div class="body">${esc(p.reason)}</div></div>`));
+      break;
+    case "approval_requested": {
+      const node = el(`<div class="card approval" id="ap-${esc(p.approval_id)}"><div class="head"><b>Approval needed</b><span>${esc(p.tool)}</span></div><pre>${esc(JSON.stringify(p.arguments, null, 2))}</pre><div class="row" style="margin-top:8px"><button class="primary">Approve</button><button class="danger">Deny</button></div></div>`);
+      const [yes, no] = node.querySelectorAll("button");
+      const decide = async (approved) => { yes.disabled = no.disabled = true;
+        try { await api(`/api/sessions/${current}/approvals/${p.approval_id}`, { method: "POST", body: JSON.stringify({ approved }) }); } catch (e) { alert(e.message); } };
+      yes.onclick = () => decide(true); no.onclick = () => decide(false);
+      add(node);
+      break;
+    }
+    case "approval_resolved": {
+      const n = document.getElementById("ap-" + p.approval_id);
+      if (n) { n.querySelectorAll("button").forEach(b => b.remove()); n.querySelector(".head span").textContent += " · " + p.outcome; }
+      break;
+    }
+    case "usage": stats.tokens = p.run_total_tokens; renderStats(); break;
+    case "run_finished":
+      stats.status = "completed"; renderStats();
+      add(el(`<div class="card final"><div class="head"><b>Final answer</b><span>${p.steps} steps · ${p.tool_calls} tool calls</span></div><div class="body">${esc(p.answer)}</div></div>`));
+      loadSessions(); break;
+    case "run_failed": case "run_stopped": case "run_cancelled":
+      stats.status = ev.type.replace("run_", ""); renderStats();
+      add(el(`<div class="card err"><div class="head"><b>${esc(ev.type.replace("_", " "))}</b></div><div class="body">${esc(p.error || p.reason || "")}</div></div>`));
+      loadSessions(); break;
+  }
+}
+
+$("newForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const goal = $("goal").value.trim(); if (!goal) return;
+  const policy = { network: $("network").value, javascript: $("js").checked,
+                   approval_required: $("approveWrites").checked ? ["write_file", "run_shell"] : [] };
+  try {
+    const s = await api("/api/sessions", { method: "POST", body: JSON.stringify({ title: goal.slice(0, 80), goal, policy }) });
+    $("goal").value = ""; await openSession(s.id);
+  } catch (err) { alert(err.message); }
+};
+$("sendFollowup").onclick = async () => {
+  const goal = $("followup").value.trim(); if (!goal || !current) return;
+  try { await api(`/api/sessions/${current}/runs`, { method: "POST", body: JSON.stringify({ goal }) }); $("followup").value = ""; loadSessions(); }
+  catch (err) { alert(err.message); }
+};
+$("followup").onkeydown = (e) => { if (e.key === "Enter") $("sendFollowup").click(); };
+$("cancelBtn").onclick = async () => { if (current) await api(`/api/sessions/${current}/cancel`, { method: "POST" }); };
+$("exportBtn").onclick = () => { if (current) window.open(art(`/api/sessions/${current}/export`)); };
+
+health(); loadSessions();
+</script>
+</body>
+</html>

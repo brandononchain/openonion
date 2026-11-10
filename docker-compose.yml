@@ -1,0 +1,78 @@
+# OpenOnion: agent API + Tor sidecar + Postgres.
+#
+#   cp .env.example .env   # set a model provider + TOR_CONTROL_PASSWORD
+#   docker compose up --build
+#   open http://127.0.0.1:8000
+#
+# Network layout:
+#   backend       (internal)  api <-> db          no internet
+#   tor_internal  (internal)  api <-> tor         no internet; Tor ports never published
+#   egress                    api, tor -> internet (model APIs, clearnet fetch, Tor relays)
+
+name: openonion
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-openonion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openonion}
+      POSTGRES_DB: ${POSTGRES_DB:-openonion}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openonion}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [backend]
+    restart: unless-stopped
+
+  tor:
+    build:
+      context: ./infra/docker/tor
+    environment:
+      TOR_CONTROL_PASSWORD: ${TOR_CONTROL_PASSWORD:?set TOR_CONTROL_PASSWORD in .env}
+      TOR_SOCKS_PORTS: ${TOR_SOCKS_PORTS:-9100-9109}
+      TOR_CONTROL_PORT: ${TOR_CONTROL_PORT:-9051}
+    # Deliberately no `ports:` — an open SOCKS proxy on your LAN is a liability.
+    networks: [tor_internal, egress]
+    restart: unless-stopped
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-openonion}:${POSTGRES_PASSWORD:-openonion}@db:5432/${POSTGRES_DB:-openonion}
+      OPENONION_DATA_DIR: /data
+      TOR_SOCKS_HOST: tor
+      TOR_SOCKS_PORTS: ${TOR_SOCKS_PORTS:-9100-9109}
+      TOR_CONTROL_HOST: tor
+      TOR_CONTROL_PORT: ${TOR_CONTROL_PORT:-9051}
+    depends_on:
+      db:
+        condition: service_healthy
+      tor:
+        condition: service_healthy
+    # Bound to localhost. Put a reverse proxy + OPENONION_API_TOKEN in front
+    # before exposing it anywhere else.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - data:/data
+    # Lets the container reach a model server (e.g. Ollama) on the host on Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [backend, tor_internal, egress]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  data:
+
+networks:
+  backend:
+    internal: true
+  tor_internal:
+    internal: true
+  egress: {}
