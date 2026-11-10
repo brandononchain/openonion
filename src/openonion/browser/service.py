@@ -16,7 +16,9 @@ What this does and does NOT give you over Tor:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from ..readable import simplify_html
 
 PRIVACY_ARGS = [
     "--disable-quic",
@@ -44,6 +46,27 @@ class PageSnapshot:
     title: str
     text: str
     screenshot: bytes | None
+    links: list[str] = field(default_factory=list)
+
+
+# Remove elements a human can't see before reading the DOM. Hidden text is a
+# common prompt-injection channel, and it is never content the reader meant.
+# Runs after the screenshot, so the screenshot still shows the page as rendered.
+STRIP_HIDDEN_JS = """() => {
+  if (!document.body) return '';
+  const doomed = [];
+  for (const el of document.body.querySelectorAll('*')) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse' ||
+        parseFloat(cs.opacity) === 0 || parseFloat(cs.fontSize) < 1) { doomed.push(el); continue; }
+    if (cs.position === 'absolute' || cs.position === 'fixed') {
+      const r = el.getBoundingClientRect();
+      if (r.right <= 0 || r.bottom <= 0 || (r.width <= 1 && r.height <= 1)) doomed.push(el);
+    }
+  }
+  for (const el of doomed) el.remove();
+  return document.documentElement.outerHTML;
+}"""
 
 
 class BrowserService:
@@ -104,7 +127,7 @@ class BrowserService:
         return ua.replace("HeadlessChrome", "Chrome")
 
     async def visit(self, url: str, *, screenshot: bool = True, wait_ms: int = 0,
-                    max_text: int = 20_000, attempts: int = 2) -> PageSnapshot:
+                    max_text: int = 400_000, attempts: int = 2) -> PageSnapshot:
         await self.start()
         last_exc: Exception | None = None
         for attempt in range(attempts):
@@ -115,10 +138,17 @@ class BrowserService:
                 if wait_ms:
                     await page.wait_for_timeout(min(wait_ms, 15_000))
                 title = await page.title()
-                text = await page.evaluate("() => document.body ? document.body.innerText : ''")
                 shot = await page.screenshot(type="jpeg", quality=60, full_page=False) if screenshot else None
+                html = await page.evaluate(STRIP_HIDDEN_JS)
+                page_text = simplify_html(html or "", page.url)
+                text, links = page_text.text, page_text.links
+                if len(text) < 200:  # canvas apps and odd markup: fall back to what's visibly rendered
+                    raw = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                    if len((raw or "").strip()) > len(text):
+                        text, links = raw.strip(), []
                 return PageSnapshot(url=url, final_url=page.url, status=resp.status if resp else None,
-                                    title=title, text=(text or "")[:max_text], screenshot=shot)
+                                    title=title or page_text.title, text=text[:max_text], screenshot=shot,
+                                    links=links)
             except Exception as exc:  # Tor circuits fail transiently; retry once.
                 last_exc = exc
                 if attempt + 1 < attempts:

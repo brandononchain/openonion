@@ -20,6 +20,7 @@
 | `providers/` | `ModelProvider` protocol; OpenAI-compatible and Anthropic adapters; scripted provider for tests and evals |
 | `tools/` | Typed tools (pydantic `Args` → JSON schema) and the registry |
 | `policy.py` | `SessionPolicy` and `PolicyEngine`: network modes, allowlists, SSRF guards, approval gates |
+| `readable.py` | Browser-to-LLM bridge: main-content extraction, hidden-text removal, markdown rendering, paging |
 | `browser/` | Playwright service with privacy flags; Tor port pool and control-port client |
 | `memory/store.py` | SQLAlchemy async store (SQLite or Postgres): sessions, events, artifacts |
 | `events.py` | Event types and the in-process fan-out bus |
@@ -47,6 +48,8 @@ providers reject dangling tool calls.
 
 Web pages are hostile input. Defences in depth:
 
+- Pages are reduced to their main content, and text a human can't see (CSS-hidden, off-screen, `aria-hidden`) is
+  removed before the model reads it.
 - Tool output is wrapped in `<tool_output trust="untrusted">`, and the system prompt forbids following instructions inside it.
 - Impact is capped by policy, not by the model: network modes, allowlists, approval gates on writes and shell,
   a workspace jail, private-IP blocking that is re-checked on every redirect, and budgets.

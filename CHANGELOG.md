@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Browser-to-LLM bridge (`openonion.readable`): `web_fetch`, `browse` and `tor_browse` now return the page's main
+  content as compact markdown, with nav, headers, footers, sidebars, forms, cookie banners, modals and ads removed.
+  Links become `[Ln]` references with the URLs listed under the text.
+- The browser removes elements hidden by CSS (display, visibility, opacity, off-screen, zero font size) before reading
+  the DOM, which closes a common prompt-injection channel. Screenshots are taken first and still show the page as rendered.
+- `offset` argument on all page tools: long pages arrive in 12k-character chunks, served from a per-session page
+  cache so paging doesn't refetch over Tor.
+
+### Changed
+- Page tools no longer cut text off at 20,000 characters; the agent pages through it instead.
+
 ## [0.1.0] - 2026-11-10
 
 ### Added

@@ -175,11 +175,20 @@ flowchart TB
 | `update_plan` | Create or revise the visible plan | always allowed |
 | `read_file`, `list_files` | Read the session workspace | allow |
 | `write_file` | Write into the session workspace | **ask** |
-| `web_fetch` | Fast clearnet HTTP fetch → readable text; re-checks policy on every redirect, blocks private IPs | allow (clearnet modes) |
-| `browse` | Headless Chromium on the clearnet, JS + screenshot | allow (clearnet modes) |
-| `tor_browse` | Headless Chromium through this session's own Tor circuits; `.onion` supported | allow (tor modes) |
+| `web_fetch` | Fast clearnet HTTP fetch → main content as markdown; re-checks policy on every redirect, blocks private IPs | allow (clearnet modes) |
+| `browse` | Headless Chromium on the clearnet, JS + screenshot → main content as markdown | allow (clearnet modes) |
+| `tor_browse` | Headless Chromium through this session's own Tor circuits; `.onion` supported → main content as markdown | allow (tor modes) |
 | `tor_new_identity` | `SIGNAL NEWNYM`: fresh circuits | allow (tor modes) |
 | `run_shell` | Bash in the workspace. **Off** unless `OPENONION_ENABLE_SHELL=true` | **ask** |
+
+### Reading the web without flooding the context
+
+Every page tool runs the same simplifier ([`readable.py`](src/openonion/readable.py), standard library only):
+
+- **Keeps the main content.** It uses `<main>`, `role=main` or the page's `<article>`, and drops navigation, headers, footers, sidebars, forms, cookie banners, modals, share bars and ads.
+- **Removes what a human can't see.** That covers `display:none`, `visibility:hidden`, zero opacity, off-screen and zero-size text, plus `hidden` and `aria-hidden`. Hidden text is a common prompt-injection channel. The screenshot is taken first, so it still shows the page as rendered.
+- **Returns compact markdown.** Headings, lists, tables, quotes and code survive. Links become `[L3]` references, and their URLs are listed once under the text.
+- **Pages through long content.** Results come in 12k-character chunks, and the agent reads on with `offset`. The page is cached for the session, so paging never refetches it over Tor.
 
 > [!TIP]
 > Add your own tool by subclassing `openonion.tools.base.Tool` (a pydantic `Args` model plus `async run()`) and registering it.
