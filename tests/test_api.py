@@ -74,6 +74,9 @@ async def test_session_lifecycle_and_sse_replay(settings):
         assert (await client.get("/favicon.ico")).status_code == 200
         assert (await client.get("/apple-touch-icon.png")).headers["content-type"] == "image/png"
         assert (await client.get("/secrets.txt")).status_code == 404
+        font = await client.get("/fonts/manrope-latin-wght.woff2")
+        assert font.status_code == 200 and font.headers["content-type"] == "font/woff2"
+        assert (await client.get("/fonts/other.woff2")).status_code == 404
     finally:
         await client.aclose()
         await ctx.__aexit__(None, None, None)
@@ -88,6 +91,32 @@ async def test_api_token_required(settings):
         assert (await client.get("/api/sessions", headers={"Authorization": "Bearer tok"})).status_code == 200
         assert (await client.get("/api/sessions?token=tok")).status_code == 200
         assert (await client.get("/api/health")).status_code == 200
+    finally:
+        await client.aclose()
+        await ctx.__aexit__(None, None, None)
+
+
+async def test_follow_up_message_can_change_policy(settings):
+    """The chat composer sends its network / approval chips with every message."""
+    app, ctx, client = await _client(settings)
+    try:
+        sid = (await client.post("/api/sessions", json={"title": "chat", "goal": "first"})).json()["id"]
+        await _wait_finished(client, sid)
+        r = await client.post(f"/api/sessions/{sid}/runs",
+                              json={"goal": "second", "policy": {"network": "tor", "approval_required": []}})
+        assert r.status_code == 202
+        session = (await client.get(f"/api/sessions/{sid}")).json()
+        assert session["settings"]["policy"]["network"] == "tor"
+        assert session["settings"]["policy"]["approval_required"] == []
+        for _ in range(100):
+            events = (await client.get(f"/api/sessions/{sid}/events")).json()
+            starts = [e for e in events if e["type"] == "run_started"]
+            if len(starts) == 2 and events[-1]["type"] == "run_finished":
+                break
+            await asyncio.sleep(0.05)
+        assert starts[1]["payload"]["policy"]["network"] == "tor"
+        bad = await client.post(f"/api/sessions/{sid}/runs", json={"goal": "x", "policy": {"network": "moon"}})
+        assert bad.status_code == 422
     finally:
         await client.aclose()
         await ctx.__aexit__(None, None, None)
