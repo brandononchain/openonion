@@ -23,6 +23,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   by default. Only the most relevant connector tools are offered per message (BM25 ranking, `OPENONION_MCP_MAX_TOOLS`),
   and `find_tools` lets the agent search for more. Connectors that reach the internet are off in Tor-only and
   Offline chats. The working card names the app ("Used add note in Notes").
+- Replies stream in as the model writes them, for OpenAI-compatible servers and Anthropic. Servers that can't stream
+  fall back to whole replies on their own. Streamed text goes out as live-only `text_delta` events (no `id`, never
+  stored); the full text still lands in `assistant_message`, so replay and export are unchanged.
+- UI motion: the composer glides between the welcome screen and the chat, status lines crossfade, steps and approvals
+  ease in, the working card and the settings window open smoothly, and a clock shows how long the agent has been
+  working. Messages appear the moment you send them. Old chats load without replaying animations, and
+  `prefers-reduced-motion` turns all of it off.
+- "Jump to latest" when you've scrolled up during a reply; small notices replace browser alert boxes.
+- The system prompt asks for plain, direct replies: no "Certainly!", no closing offers, no filler words.
 - `tools_selected` event records which connector tools each run was offered.
 - Docker image includes Node.js and uv so `npx` and `uvx` connectors run inside it.
 

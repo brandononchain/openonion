@@ -11,8 +11,8 @@ from typing import Any
 
 import httpx
 
-from ._http import post_json
-from .base import Message, ModelResponse, ProviderError, ToolCall, Usage
+from ._http import StreamUnsupported, post_json, stream_sse
+from .base import Message, ModelResponse, ProviderError, TextSink, ToolCall, Usage
 
 
 def to_openai_messages(messages: list[Message]) -> list[dict[str, Any]]:
@@ -61,8 +61,11 @@ class OpenAICompatProvider:
         self.api_key = api_key
         self.max_tokens = max_tokens
         self._client = httpx.AsyncClient(timeout=timeout)
+        self._can_stream = True
+        self._usage_opt = True  # some servers reject stream_options; drop it if so
 
-    async def complete(self, messages: list[Message], tools: list[dict[str, Any]]) -> ModelResponse:
+    async def complete(self, messages: list[Message], tools: list[dict[str, Any]],
+                       on_text: TextSink = None) -> ModelResponse:
         body: dict[str, Any] = {
             "model": self.model,
             "messages": to_openai_messages(messages),
@@ -77,8 +80,56 @@ class OpenAICompatProvider:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        data = await post_json(self._client, f"{self.base_url}/chat/completions", body, headers)
+        url = f"{self.base_url}/chat/completions"
+        if on_text and self._can_stream:
+            for _ in range(2):
+                try:
+                    return await self._stream(url, body, headers, on_text)
+                except StreamUnsupported:
+                    if self._usage_opt:
+                        self._usage_opt = False
+                        continue
+                    self._can_stream = False  # this server can't stream; stop asking
+                    break
+        data = await post_json(self._client, url, body, headers)
+        return self._parse(data)
 
+    async def _stream(self, url: str, body: dict[str, Any], headers: dict[str, str],
+                      on_text: Any) -> ModelResponse:
+        body = {**body, "stream": True}
+        if self._usage_opt:
+            body["stream_options"] = {"include_usage": True}
+        text: list[str] = []
+        calls: dict[int, dict[str, Any]] = {}
+        usage: dict[str, Any] = {}
+        finish = None
+        async for chunk in stream_sse(self._client, url, body, headers):
+            if "__whole__" in chunk:
+                resp = self._parse(chunk["__whole__"])
+                if resp.text:
+                    await on_text(resp.text)
+                return resp
+            usage = chunk.get("usage") or usage
+            for choice in chunk.get("choices") or []:
+                finish = choice.get("finish_reason") or finish
+                delta = choice.get("delta") or {}
+                if delta.get("content"):
+                    text.append(delta["content"])
+                    await on_text(delta["content"])
+                for tc in delta.get("tool_calls") or []:
+                    slot = calls.setdefault(tc.get("index", len(calls)), {"id": None, "name": "", "args": ""})
+                    slot["id"] = tc.get("id") or slot["id"]
+                    fn = tc.get("function") or {}
+                    slot["name"] += fn.get("name") or ""
+                    a = fn.get("arguments")
+                    slot["args"] += a if isinstance(a, str) else (json.dumps(a) if a else "")
+        tool_calls = [ToolCall(id=c["id"] or f"call_{i}", name=c["name"], arguments=parse_arguments(c["args"]))
+                      for i, c in sorted(calls.items()) if c["name"]]
+        return ModelResponse(text="".join(text), tool_calls=tool_calls,
+                             usage=Usage(usage.get("prompt_tokens", 0) or 0, usage.get("completion_tokens", 0) or 0),
+                             stop_reason=finish)
+
+    def _parse(self, data: dict[str, Any]) -> ModelResponse:
         try:
             choice = data["choices"][0]
             msg = choice["message"]

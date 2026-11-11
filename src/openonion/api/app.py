@@ -59,6 +59,8 @@ class ApprovalDecision(BaseModel):
 
 
 def _sse(event) -> str:
+    if event.seq <= 0:  # live-only event: no id, so it never moves the replay cursor
+        return f"data: {json.dumps(event.to_dict())}\n\n"
     return f"id: {event.seq}\ndata: {json.dumps(event.to_dict())}\n\n"
 
 
@@ -181,6 +183,9 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
                         event = await asyncio.wait_for(queue.get(), 15)
                     except asyncio.TimeoutError:
                         yield ": keep-alive\n\n"
+                        continue
+                    if event.seq <= 0:
+                        yield _sse(event)
                         continue
                     if event.seq <= sent:
                         continue

@@ -25,6 +25,9 @@ APPROVAL_RESOLVED = "approval_resolved"
 ARTIFACT_CREATED = "artifact_created"
 POLICY_DENIED = "policy_denied"
 TOOLS_SELECTED = "tools_selected"
+# Live-only: streamed model text. Published on the bus with seq=0 and never stored;
+# the full text always follows in assistant_message.
+TEXT_DELTA = "text_delta"
 USAGE = "usage"
 RUN_FINISHED = "run_finished"
 RUN_FAILED = "run_failed"

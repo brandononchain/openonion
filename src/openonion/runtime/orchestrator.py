@@ -41,6 +41,12 @@ How to talk:
 - Write replies in Markdown: short paragraphs, lists where they help, `code` for paths and commands. Lead with the
   answer, then the supporting detail. When you used web pages, name the sources you relied on.
 - If a request is ambiguous in a way that changes the work, ask one short question instead of guessing.
+- Sound like a person, not a brochure. No openers like "Certainly!" or "Great question", no closing offers like
+  "Let me know if you need anything else", no recap of what you just said. Skip filler words (crucial, delve,
+  seamless, robust, leverage) and don't force ideas into threes. Use plain "is" and "has". Bold only what someone
+  scanning would need, and don't decorate with emoji unless the user does.
+- Status lines before tool calls are one plain sentence in the present tense ("Reading the Tor Project's blog."),
+  not announcements ("I will now proceed to…").
 
 How to work (when a request needs tools):
 - For anything that takes more than one or two tool calls, first call `update_plan` with a short, concrete plan,
@@ -122,6 +128,27 @@ class Orchestrator:
         self.bus.publish(event)
         return event
 
+    def _live_text(self, step: int):
+        """A text sink for one model call. Deltas are batched (~20 updates a second)
+        and published on the bus only: the stored log gets the whole message once."""
+        buf: list[str] = []
+        last = [0.0]
+
+        def flush() -> None:
+            if buf:
+                self.bus.publish(Event(self.session_id, 0, ev.TEXT_DELTA, {"step": step, "text": "".join(buf)}))
+                buf.clear()
+            last[0] = time.monotonic()
+
+        async def sink(piece: str) -> None:
+            buf.append(piece)
+            if time.monotonic() - last[0] >= 0.05:
+                flush()
+            await asyncio.sleep(0)
+
+        sink.flush = flush  # type: ignore[attr-defined]
+        return sink
+
     async def _record(self, messages: list[Message], msg: Message) -> None:
         messages.append(msg)
         await self.emit(ev.TRANSCRIPT, {"message": msg.to_dict()})
@@ -151,7 +178,7 @@ class Orchestrator:
         try:
             approved = await asyncio.wait_for(fut, self.settings.approval_timeout_s)
             outcome = "approved" if approved else "denied"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             approved, outcome = False, "timed_out"
         finally:
             self._approvals.pop(approval_id, None)
@@ -196,7 +223,7 @@ class Orchestrator:
             result = await asyncio.wait_for(tool.run(args, ctx), self.settings.tool_timeout_s)
         except ToolError as exc:
             result = ToolResult.error(str(exc))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = ToolResult.error(f"{call.name} timed out after {self.settings.tool_timeout_s}s")
         except asyncio.CancelledError:
             raise
@@ -252,7 +279,9 @@ class Orchestrator:
 
             for step in range(1, self.policy.max_steps + 1):
                 tool_specs = self.toolbox.specs()
-                response = await self.provider.complete(messages, tool_specs)
+                sink = self._live_text(step)
+                response = await self.provider.complete(messages, tool_specs, on_text=sink)
+                sink.flush()
                 self.tokens += response.usage.total
                 await self.emit(ev.USAGE, {"step": step, "input_tokens": response.usage.input_tokens,
                                            "output_tokens": response.usage.output_tokens,

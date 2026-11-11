@@ -43,6 +43,10 @@ SSE client connects with ?after=N or Last-Event-ID
    3. stream live; on a seq gap (slow consumer dropped events), backfill from the store
 ```
 
+Streamed model text is the one exception to "store first": `text_delta` events are published on the bus with
+`seq = 0`, sent over SSE without an `id`, and never stored. They are a live preview only. The complete text arrives
+in the stored `assistant_message` right after, so a client that misses deltas (or replays later) loses nothing.
+
 `transcript` events hold the exact model-facing messages, so a follow-up run rebuilds the model context from the
 log alone. `repair_transcript` fills in any tool call that a cancelled run left without a result, because
 providers reject dangling tool calls.
