@@ -27,13 +27,15 @@ class SessionBusy(RuntimeError):
 class SessionManager:
     def __init__(self, store: Store, bus: EventBus, settings: Settings,
                  provider_factory: ProviderFactory = build_provider,
-                 registry: ToolRegistry | None = None) -> None:
+                 registry: ToolRegistry | None = None, connectors=None) -> None:
         self.store = store
         self.bus = bus
         self.settings = settings
         self.provider_factory = provider_factory
+        self._custom_registry = registry is not None
         self.registry = registry or default_registry(settings)
         self.tor_pool = TorPortPool(settings.tor_socks_ports)
+        self.connectors = connectors
         self._runs: dict[str, tuple[Orchestrator, asyncio.Task]] = {}
 
     def is_running(self, session_id: str) -> bool:
@@ -50,7 +52,8 @@ class SessionManager:
         provider = self.provider_factory(self.settings)
         services = SessionServices(session_id, self.settings, policy, self.tor_pool)
         orch = Orchestrator(session_id, store=self.store, bus=self.bus, provider=provider,
-                            registry=self.registry, policy=policy, settings=self.settings, services=services)
+                            registry=self.registry, policy=policy, settings=self.settings, services=services,
+                            connectors=self.connectors)
 
         async def runner() -> None:
             try:
@@ -61,6 +64,17 @@ class SessionManager:
         task = asyncio.create_task(runner(), name=f"openonion-run-{session_id}")
         self._runs[session_id] = (orch, task)
         return task
+
+    def any_running(self) -> bool:
+        return any(not task.done() for _, task in self._runs.values())
+
+    def reconfigure(self, changed: list[str]) -> None:
+        """Apply settings saved from the UI. Provider settings take effect on the next message automatically,
+        because a provider is built per run; the tool list and Tor slots are rebuilt here."""
+        if "enable_shell" in changed and not self._custom_registry:
+            self.registry = default_registry(self.settings)
+        if "tor_socks_ports" in changed:
+            self.tor_pool = TorPortPool(self.settings.tor_socks_ports)
 
     def resolve_approval(self, session_id: str, approval_id: str, approved: bool) -> bool:
         entry = self._runs.get(session_id)

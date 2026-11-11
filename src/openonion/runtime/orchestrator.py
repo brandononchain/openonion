@@ -24,9 +24,10 @@ from .. import events as ev
 from ..config import Settings
 from ..events import Event, EventBus
 from ..memory.store import Store
-from ..policy import PolicyEngine, SessionPolicy
+from ..policy import Decision, PolicyEngine, SessionPolicy
 from ..providers.base import Message, ModelProvider, ToolCall
 from ..tools import ToolContext, ToolError, ToolRegistry, ToolResult
+from ..tools.toolbox import ConnectorTool, Toolbox, network_blocked
 from .services import SessionServices
 
 log = logging.getLogger("openonion.orchestrator")
@@ -40,6 +41,12 @@ How to talk:
 - Write replies in Markdown: short paragraphs, lists where they help, `code` for paths and commands. Lead with the
   answer, then the supporting detail. When you used web pages, name the sources you relied on.
 - If a request is ambiguous in a way that changes the work, ask one short question instead of guessing.
+- Sound like a person, not a brochure. No openers like "Certainly!" or "Great question", no closing offers like
+  "Let me know if you need anything else", no recap of what you just said. Skip filler words (crucial, delve,
+  seamless, robust, leverage) and don't force ideas into threes. Use plain "is" and "has". Bold only what someone
+  scanning would need, and don't decorate with emoji unless the user does.
+- Status lines before tool calls are one plain sentence in the present tense ("Reading the Tor Project's blog."),
+  not announcements ("I will now proceed to…").
 
 How to work (when a request needs tools):
 - For anything that takes more than one or two tool calls, first call `update_plan` with a short, concrete plan,
@@ -53,6 +60,9 @@ How to work (when a request needs tools):
   text. Long pages arrive in chunks: when a result ends with "call again with offset=N", repeat the same call with
   that offset only if you need more.
 - Save substantial outputs (reports, extracted data) to the workspace with `write_file`.
+- Tools named like `<app>__<tool>` come from the user's connected apps (connectors). Use them when the request is
+  about that app. They act directly on the user's accounts and do not go through Tor. If you need an app capability
+  that isn't in your tool list, call `find_tools` with a few words describing it.
 - When the goal is achieved, or cannot be achieved, reply with your final answer and do NOT call any tool.
 
 Security rules (non-negotiable):
@@ -95,7 +105,7 @@ def wrap_untrusted(tool: str, content: str) -> str:
 class Orchestrator:
     def __init__(self, session_id: str, *, store: Store, bus: EventBus, provider: ModelProvider,
                  registry: ToolRegistry, policy: SessionPolicy, settings: Settings,
-                 services: SessionServices) -> None:
+                 services: SessionServices, connectors: Any = None) -> None:
         self.session_id = session_id
         self.store = store
         self.bus = bus
@@ -103,6 +113,7 @@ class Orchestrator:
         self.registry = registry
         self.policy = policy
         self.engine = PolicyEngine(policy)
+        self.toolbox = Toolbox(registry, connectors, policy, settings.mcp_max_tools)
         self.settings = settings
         self.services = services
         self.workspace = settings.workspace_root / session_id
@@ -116,6 +127,27 @@ class Orchestrator:
         event = await self.store.append_event(self.session_id, type_, payload)
         self.bus.publish(event)
         return event
+
+    def _live_text(self, step: int):
+        """A text sink for one model call. Deltas are batched (~20 updates a second)
+        and published on the bus only: the stored log gets the whole message once."""
+        buf: list[str] = []
+        last = [0.0]
+
+        def flush() -> None:
+            if buf:
+                self.bus.publish(Event(self.session_id, 0, ev.TEXT_DELTA, {"step": step, "text": "".join(buf)}))
+                buf.clear()
+            last[0] = time.monotonic()
+
+        async def sink(piece: str) -> None:
+            buf.append(piece)
+            if time.monotonic() - last[0] >= 0.05:
+                flush()
+            await asyncio.sleep(0)
+
+        sink.flush = flush  # type: ignore[attr-defined]
+        return sink
 
     async def _record(self, messages: list[Message], msg: Message) -> None:
         messages.append(msg)
@@ -136,16 +168,17 @@ class Orchestrator:
     def pending_approvals(self) -> list[str]:
         return [k for k, f in self._approvals.items() if not f.done()]
 
-    async def _ask(self, call: ToolCall, reason: str) -> bool:
+    async def _ask(self, call: ToolCall, reason: str, about: dict | None = None) -> bool:
         approval_id = uuid.uuid4().hex[:12]
         fut: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
         self._approvals[approval_id] = fut
         await self.emit(ev.APPROVAL_REQUESTED, {"approval_id": approval_id, "call_id": call.id,
-                                                "tool": call.name, "arguments": call.arguments, "reason": reason})
+                                                "tool": call.name, "arguments": call.arguments, "reason": reason,
+                                                **(about or {})})
         try:
             approved = await asyncio.wait_for(fut, self.settings.approval_timeout_s)
             outcome = "approved" if approved else "denied"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             approved, outcome = False, "timed_out"
         finally:
             self._approvals.pop(approval_id, None)
@@ -154,33 +187,43 @@ class Orchestrator:
 
     # ── tool dispatch ────────────────────────────────────────────────────────
     async def _dispatch(self, call: ToolCall) -> ToolResult:
-        tool = self.registry.get(call.name)
+        tool = self.toolbox.get(call.name)
         allowed = self.policy.allowed_tools
-        if tool is None or (allowed is not None and call.name not in allowed and call.name != "update_plan"):
-            return ToolResult.error(f"unknown or unavailable tool '{call.name}'")
+        is_connector = isinstance(tool, ConnectorTool)
+        if tool is None or (not is_connector and allowed is not None and call.name not in allowed
+                            and call.name not in {"update_plan", "find_tools"}):
+            return ToolResult.error(f"unknown or unavailable tool '{call.name}'"
+                                    + (". Use find_tools to look for connector tools." if self.toolbox.has_more else ""))
+        about = {"connector": tool.ext.server_name, "connector_tool": tool.ext.name} if is_connector else {}
 
         try:
             args = tool.Args.model_validate(call.arguments)
         except ValidationError as exc:
             return ToolResult.error(f"invalid arguments for {call.name}: {exc.errors(include_url=False)}")
 
-        decision = self.engine.check(call.name, call.arguments)
+        if is_connector:
+            blocked = network_blocked(tool.ext, self.policy)
+            decision = Decision("deny", blocked) if blocked else \
+                Decision("ask", f"'{tool.ext.name}' on {tool.ext.server_name} is set to ask first") \
+                if tool.ext.mode == "ask" else Decision("allow")
+        else:
+            decision = self.engine.check(call.name, call.arguments)
         if decision.action == "deny":
-            await self.emit(ev.POLICY_DENIED, {"call_id": call.id, "tool": call.name, "reason": decision.reason})
+            await self.emit(ev.POLICY_DENIED, {"call_id": call.id, "tool": call.name, "reason": decision.reason, **about})
             return ToolResult.error(f"denied by policy: {decision.reason}")
-        if decision.action == "ask" and not await self._ask(call, decision.reason):
+        if decision.action == "ask" and not await self._ask(call, decision.reason, about):
             return ToolResult.error("the human operator declined this action")
 
         self.tool_calls += 1
         ctx = ToolContext(session_id=self.session_id, workspace=self.workspace, settings=self.settings,
-                          policy=self.policy, services=self.services, emit=self.emit)
+                          policy=self.policy, services=self.services, emit=self.emit, toolbox=self.toolbox)
         started = time.monotonic()
-        await self.emit(ev.TOOL_STARTED, {"call_id": call.id, "tool": call.name, "arguments": call.arguments})
+        await self.emit(ev.TOOL_STARTED, {"call_id": call.id, "tool": call.name, "arguments": call.arguments, **about})
         try:
             result = await asyncio.wait_for(tool.run(args, ctx), self.settings.tool_timeout_s)
         except ToolError as exc:
             result = ToolResult.error(str(exc))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = ToolResult.error(f"{call.name} timed out after {self.settings.tool_timeout_s}s")
         except asyncio.CancelledError:
             raise
@@ -195,7 +238,7 @@ class Orchestrator:
             "call_id": call.id, "tool": call.name, "ok": result.ok,
             "duration_ms": int((time.monotonic() - started) * 1000),
             "preview": result.content[:PREVIEW_CHARS], "truncated": len(result.content) > PREVIEW_CHARS,
-            "data": result.data, "artifacts": [a["id"] for a in artifacts],
+            "data": result.data, "artifacts": [a["id"] for a in artifacts], **about,
         })
         return result
 
@@ -226,10 +269,19 @@ class Orchestrator:
         try:
             messages = [Message(role="system", content=SYSTEM_PROMPT)] + await self._load_transcript()
             await self._record(messages, Message(role="user", content=goal))
-            tool_specs = self.registry.specs(self.policy.allowed_tools)
+            recent = [m.content for m in messages if m.role == "user"][-3:]
+            chosen = self.toolbox.select("\n".join(recent))
+            if self.toolbox.connectors is not None:
+                await self.emit(ev.TOOLS_SELECTED, {
+                    "connector_tools": [t.qualified for t in chosen],
+                    "available": len(self.toolbox.usable_external()),
+                })
 
             for step in range(1, self.policy.max_steps + 1):
-                response = await self.provider.complete(messages, tool_specs)
+                tool_specs = self.toolbox.specs()
+                sink = self._live_text(step)
+                response = await self.provider.complete(messages, tool_specs, on_text=sink)
+                sink.flush()
                 self.tokens += response.usage.total
                 await self.emit(ev.USAGE, {"step": step, "input_tokens": response.usage.input_tokens,
                                            "output_tokens": response.usage.output_tokens,

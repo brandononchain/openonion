@@ -16,4 +16,4 @@ def build_provider(settings: Settings) -> ModelProvider:
     raise ProviderError(f"unknown provider '{settings.provider}' (use 'openai' or 'anthropic')")
 
 
-__all__ = ["build_provider", "Message", "ModelProvider", "ModelResponse", "ProviderError", "ToolCall", "Usage"]
+__all__ = ["Message", "ModelProvider", "ModelResponse", "ProviderError", "ToolCall", "Usage", "build_provider"]

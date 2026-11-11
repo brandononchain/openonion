@@ -67,6 +67,9 @@ class Settings:
     approval_timeout_s: int = 600
     tool_timeout_s: int = 180
 
+    # Connectors (MCP): how many connector tools the model sees per message before it has to search for more.
+    mcp_max_tools: int = 6
+
     @property
     def workspace_root(self) -> Path:
         return self.data_dir / "workspaces"
@@ -98,6 +101,7 @@ class Settings:
             enable_shell=_bool("OPENONION_ENABLE_SHELL", False),
             approval_timeout_s=_int("OPENONION_APPROVAL_TIMEOUT", 600),
             tool_timeout_s=_int("OPENONION_TOOL_TIMEOUT", 180),
+            mcp_max_tools=_int("OPENONION_MCP_MAX_TOOLS", 6),
         )
 
     def ensure_dirs(self) -> None:

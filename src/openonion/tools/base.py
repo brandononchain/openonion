@@ -51,6 +51,7 @@ class ToolContext:
     policy: "SessionPolicy"
     services: "SessionServices"
     emit: Any  # async (type, payload) -> Event
+    toolbox: Any = None  # the run's Toolbox (used by find_tools)
 
 
 class Tool(ABC):

@@ -6,8 +6,9 @@ and from its wire format. Swapping providers never touches agent logic.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Optional, Protocol
 
 
 @dataclass
@@ -20,7 +21,7 @@ class ToolCall:
         return {"id": self.id, "name": self.name, "arguments": self.arguments}
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ToolCall":
+    def from_dict(cls, d: dict[str, Any]) -> ToolCall:
         return cls(id=d["id"], name=d["name"], arguments=d.get("arguments") or {})
 
 
@@ -42,7 +43,7 @@ class Message:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Message":
+    def from_dict(cls, d: dict[str, Any]) -> Message:
         return cls(
             role=d["role"],
             content=d.get("content") or "",
@@ -74,12 +75,19 @@ class ProviderError(RuntimeError):
     pass
 
 
+# Called with each new piece of reply text as it streams in.
+TextSink = Optional[Callable[[str], Awaitable[None]]]
+
+
 class ModelProvider(Protocol):
     name: str
     model: str
 
-    async def complete(self, messages: list[Message], tools: list[dict[str, Any]]) -> ModelResponse:
-        """tools: [{"name", "description", "parameters": <JSON schema>}]"""
+    async def complete(self, messages: list[Message], tools: list[dict[str, Any]],
+                       on_text: TextSink = None) -> ModelResponse:
+        """tools: [{"name", "description", "parameters": <JSON schema>}].
+        When on_text is given, the provider streams and calls it with text deltas;
+        the returned ModelResponse still carries the full text."""
         ...
 
     async def aclose(self) -> None: ...

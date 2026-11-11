@@ -19,6 +19,9 @@
 | `runtime/services.py` | Per-session resources: clearnet browser, Tor browser and Tor slot, created lazily and closed together |
 | `providers/` | `ModelProvider` protocol; OpenAI-compatible and Anthropic adapters; scripted provider for tests and evals |
 | `tools/` | Typed tools (pydantic `Args` → JSON schema) and the registry |
+| `connectors.py` | MCP connections, one long-lived task per server (stdio or Streamable HTTP); tool listing and calls |
+| `tools/toolbox.py` | Picks which tools the model sees each turn: built-ins plus the top-ranked connector tools, and `find_tools` |
+| `settings_store.py` | Settings saved from the UI (`settings.json`, mode 600), applied over the environment |
 | `policy.py` | `SessionPolicy` and `PolicyEngine`: network modes, allowlists, SSRF guards, approval gates |
 | `readable.py` | Browser-to-LLM bridge: main-content extraction, hidden-text removal, markdown rendering, paging |
 | `browser/` | Playwright service with privacy flags; Tor port pool and control-port client |
@@ -39,6 +42,10 @@ SSE client connects with ?after=N or Last-Event-ID
    2. replay seq > N from the store
    3. stream live; on a seq gap (slow consumer dropped events), backfill from the store
 ```
+
+Streamed model text is the one exception to "store first": `text_delta` events are published on the bus with
+`seq = 0`, sent over SSE without an `id`, and never stored. They are a live preview only. The complete text arrives
+in the stored `assistant_message` right after, so a client that misses deltas (or replays later) loses nothing.
 
 `transcript` events hold the exact model-facing messages, so a follow-up run rebuilds the model context from the
 log alone. `repair_transcript` fills in any tool call that a cancelled run left without a result, because

@@ -13,6 +13,8 @@ Endpoints (all under /api, bearer-token protected when OPENONION_API_TOKEN is se
   GET    /sessions/{id}/export              full event log as JSON Lines
   GET    /artifacts/{artifact_id}           artifact bytes
   GET    /health                            liveness + config summary
+
+Settings and connector routes live in settings_api.py.
 """
 
 from __future__ import annotations
@@ -31,6 +33,9 @@ from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..config import Settings
+from ..connectors import ConnectorManager
+from ..settings_store import SettingsStore
+from . import settings_api
 from ..events import TRANSCRIPT, EventBus
 from ..memory.store import Store
 from ..policy import SessionPolicy
@@ -54,6 +59,8 @@ class ApprovalDecision(BaseModel):
 
 
 def _sse(event) -> str:
+    if event.seq <= 0:  # live-only event: no id, so it never moves the replay cursor
+        return f"data: {json.dumps(event.to_dict())}\n\n"
     return f"id: {event.seq}\ndata: {json.dumps(event.to_dict())}\n\n"
 
 
@@ -62,18 +69,23 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     settings.ensure_dirs()
     store = Store(settings.database_url)
     bus = EventBus()
+    settings_store = SettingsStore(settings)  # applies anything saved from the settings modal
+    connectors = ConnectorManager()
     kwargs = {"provider_factory": provider_factory} if provider_factory else {}
-    manager = SessionManager(store, bus, settings, **kwargs)
+    manager = SessionManager(store, bus, settings, connectors=connectors, **kwargs)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await store.init()
+        await connectors.sync(settings_store.mcp_servers)  # connects in the background
         yield
         await manager.shutdown()
+        await connectors.close()
         await store.close()
 
     app = FastAPI(title="OpenOnion", version=__version__, lifespan=lifespan)
     app.state.settings, app.state.store, app.state.bus, app.state.manager = settings, store, bus, manager
+    app.state.settings_store, app.state.connectors = settings_store, connectors
 
     async def auth(request: Request) -> None:
         if not settings.api_token:
@@ -89,6 +101,8 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         if session is None:
             raise HTTPException(404, "session not found")
         return session
+
+    settings_api.register(app, auth, store=settings_store, manager=manager, connectors=connectors)
 
     # ── sessions ─────────────────────────────────────────────────────────────
     @app.post("/api/sessions", dependencies=[Depends(auth)], status_code=201)
@@ -169,6 +183,9 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
                         event = await asyncio.wait_for(queue.get(), 15)
                     except asyncio.TimeoutError:
                         yield ": keep-alive\n\n"
+                        continue
+                    if event.seq <= 0:
+                        yield _sse(event)
                         continue
                     if event.seq <= sent:
                         continue

@@ -238,6 +238,13 @@ curl -s http://127.0.0.1:8000/api/sessions \
 
 ## ⚙️ Configuration
 
+The easiest way is the **settings window** in the app (the gear in the sidebar, or Ctrl+,). It has presets for
+Unsloth, Ollama, LM Studio, OpenAI, OpenRouter and Anthropic, lists the models a server offers, and tests the
+connection, including whether the model can call tools. It also checks that Tor is working. Changes apply to the
+next message without a restart. They're saved to `settings.json` in the data folder (readable only by the account
+OpenOnion runs as) and take priority over the environment variables below. Keys are write-only: the UI can set or
+remove them but never reads them back.
+
 | Variable | Default | Notes |
 |---|---|---|
 | `OPENONION_PROVIDER` | `openai` | `openai` (any compatible endpoint) or `anthropic` |
@@ -250,6 +257,29 @@ curl -s http://127.0.0.1:8000/api/sessions \
 | `TOR_CONTROL_HOST` / `TOR_CONTROL_PORT` / `TOR_CONTROL_PASSWORD` | `127.0.0.1` / `9051` / — | Needed for `tor_new_identity` and `tor-check` |
 | `OPENONION_API_TOKEN` | — | Enables API auth |
 | `OPENONION_ENABLE_SHELL` | `false` | Registers `run_shell` |
+| `OPENONION_MCP_MAX_TOOLS` | `6` | Connector tools offered to the model per message |
+
+`DATABASE_URL`, `OPENONION_DATA_DIR` and `OPENONION_API_TOKEN` can only be set in the environment.
+
+## 🔌 Connectors (MCP)
+
+Connect any app or service that speaks the [Model Context Protocol](https://modelcontextprotocol.io): GitHub, your
+files, a database, a calendar. Add them under **Settings, Connectors**, either as a command the server runs
+(`npx -y @modelcontextprotocol/server-github`, `uvx mcp-server-fetch`) or as a remote Streamable HTTP address.
+Tokens go in environment variables or headers, and are stored server-side and never shown again.
+
+**Only relevant tools.** A few connectors can expose hundreds of tools, and dumping them all into the prompt wastes
+context and confuses models. OpenOnion ranks connector tools against what you asked and offers only the best few
+(`OPENONION_MCP_MAX_TOOLS`, default 6). If the agent needs something else mid-task, it calls `find_tools` to search
+every connector and load the matches.
+
+**You stay in control.**
+
+- Each tool is set to *Allow*, *Ask first* or *Off*. Tools the server marks read-only start as Allow; everything
+  else starts as Ask first.
+- Connector traffic does **not** go through Tor. Connectors marked "reaches the internet" are switched off in
+  Tor-only and Offline chats.
+- Results come back wrapped as untrusted data, like every other tool result.
 
 ## 🗂️ Project layout
 
@@ -258,7 +288,9 @@ openonion/
 ├── src/openonion/
 │   ├── runtime/        # orchestrator loop, session manager, per-session services
 │   ├── providers/      # OpenAI-compatible, Anthropic, scripted (tests & evals)
-│   ├── tools/          # typed tools: fs, web, browser, tor, plan, shell
+│   ├── tools/          # typed tools + the toolbox that picks relevant connector tools
+│   ├── connectors.py   # MCP connections (stdio + Streamable HTTP)
+│   ├── settings_store.py # settings saved from the UI
 │   ├── browser/        # Playwright service + Tor port pool & control client
 │   ├── memory/         # async SQLAlchemy store (SQLite / Postgres)
 │   ├── api/            # FastAPI app: REST, SSE replay, export, auth
@@ -291,7 +323,8 @@ Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - [x] **Phase 1: core agent.** Transparent loop, event log with SSE replay, policy engine, per-session Tor isolation, web UI.
 - [ ] **Phase 2: subagents.** Research, coding, browser and validation subagents with handoff contracts.
-- [ ] **Phase 3: skills and plugins.** `SKILL.md` task contracts, and MCP servers as tool backends.
+- [x] **MCP connectors** with per-tool control and relevance-based tool selection.
+- [ ] **Phase 3: skills and plugins.** `SKILL.md` task contracts and installable plugin bundles.
 - [ ] **Phase 4: multi-agent workflows.** Parallel DAGs, a shared artifact store, signed action receipts.
 - [ ] **Hardening.** Per-session gVisor or microVM sandboxes for `run_shell`, a Tor Browser–grade fingerprint profile (Firefox + `resistFingerprinting`), and a queue-backed runner for horizontal scale.
 

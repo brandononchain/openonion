@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Union
+import re
+from collections.abc import Callable
+from typing import Any, Union
 
-from .base import Message, ModelResponse, ProviderError
+from .base import Message, ModelResponse, ProviderError, TextSink
 
 Step = Union[ModelResponse, Callable[[list[Message]], ModelResponse]]
 
@@ -17,12 +19,18 @@ class ScriptedProvider:
         self.steps = list(steps)
         self.calls: list[list[Message]] = []
 
-    async def complete(self, messages: list[Message], tools: list[dict[str, Any]]) -> ModelResponse:
+    async def complete(self, messages: list[Message], tools: list[dict[str, Any]],
+                       on_text: TextSink = None) -> ModelResponse:
         self.calls.append(list(messages))
         if not self.steps:
             raise ProviderError("scripted provider ran out of steps")
         step = self.steps.pop(0)
-        return step(messages) if callable(step) else step
+        resp = step(messages) if callable(step) else step
+        if on_text and resp.text:
+            # Stream word by word, like a real model, so live rendering gets exercised.
+            for piece in re.findall(r"\S+\s*|\s+", resp.text):
+                await on_text(piece)
+        return resp
 
     async def aclose(self) -> None:
         return None
