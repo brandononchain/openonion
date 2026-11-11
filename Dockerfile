@@ -11,7 +11,11 @@ COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 
 # Chromium + its system libraries must be installed as root.
-RUN pip install ".[postgres,browser]" \
+# libatomic1: the Node.js runtime bundled with Playwright links against it,
+# and the slim base image doesn't ship it.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libatomic1 \
+ && pip install ".[postgres,browser]" \
  && playwright install --with-deps chromium \
  && rm -rf /var/lib/apt/lists/*
 

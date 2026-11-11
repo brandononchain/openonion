@@ -1,0 +1,52 @@
+name: 🐛 Bug report
+description: Something isn't working as expected.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **If this could leak a user's IP, DNS or traffic outside Tor, please use private
+        security reporting instead.**
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. docker compose up --build
+        2. Start a session with network "tor" and goal "..."
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running OpenOnion?
+      options:
+        - Docker Compose
+        - Local Python
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Model provider and model
+      placeholder: e.g. Ollama / qwen2.5:14b
+  - type: input
+    id: version
+    attributes:
+      label: OpenOnion version or commit
+      placeholder: e.g. 0.1.0 or a1b2c3d
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or exported events
+      description: Remove anything sensitive before pasting.
+      render: shell

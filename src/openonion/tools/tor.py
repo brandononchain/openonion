@@ -6,14 +6,14 @@ from pydantic import BaseModel, Field
 
 from ..browser.tor import tor_new_identity
 from .base import Tool, ToolContext, ToolError, ToolResult
-from .web import _snapshot_result
+from .web import OFFSET_DESC, _page_result, _recall, _snapshot_result
 
 
 class TorBrowse(Tool):
     name = "tor_browse"
     description = (
         "Open a URL (clearnet or .onion) in a headless browser routed through this session's own Tor circuits. "
-        "Your IP is hidden; slower than clearnet. Returns page text and a screenshot."
+        "Your IP is hidden; slower than clearnet. Returns the main content as markdown (links as [Ln]) and a screenshot."
     )
     risk = "network"
 
@@ -21,11 +21,14 @@ class TorBrowse(Tool):
         url: str = Field(description="Absolute http(s) URL, including .onion addresses.")
         screenshot: bool = True
         wait_ms: int = Field(0, ge=0, le=15000)
+        offset: int = Field(0, ge=0, description=OFFSET_DESC)
 
     async def run(self, args: Args, ctx: ToolContext) -> ToolResult:
+        if cached := _recall(ctx, self.name, args.url, args.offset):
+            return _page_result(cached, args.offset)
         browser = await ctx.services.tor_browser()
         snap = await browser.visit(args.url, screenshot=args.screenshot, wait_ms=args.wait_ms)
-        return _snapshot_result("tor_browse", snap, via=f"tor:{ctx.services.tor_port}")
+        return _snapshot_result(self.name, snap, f"tor:{ctx.services.tor_port}", ctx, args.url, args.offset)
 
 
 class TorNewIdentity(Tool):

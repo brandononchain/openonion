@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
+from typing import Any
+
 from ..browser.service import BrowserService
 from ..browser.tor import TorPortPool
 from ..config import Settings
@@ -17,6 +20,18 @@ class SessionServices:
         self.tor_port: int | None = None
         self._clearnet: BrowserService | None = None
         self._tor: BrowserService | None = None
+        # Last few pages read, so `offset` paging doesn't refetch (slow over Tor,
+        # and the page could change between reads).
+        self._pages: OrderedDict[tuple[str, str], dict[str, Any]] = OrderedDict()
+
+    def remember_page(self, tool: str, url: str, page: dict[str, Any], keep: int = 8) -> None:
+        self._pages[(tool, url)] = page
+        self._pages.move_to_end((tool, url))
+        while len(self._pages) > keep:
+            self._pages.popitem(last=False)
+
+    def recall_page(self, tool: str, url: str) -> dict[str, Any] | None:
+        return self._pages.get((tool, url))
 
     async def clearnet_browser(self) -> BrowserService:
         if self._clearnet is None:
@@ -45,5 +60,6 @@ class SessionServices:
                 except Exception:
                     pass
         self._clearnet = self._tor = None
+        self._pages.clear()
         await self.tor_pool.release(self.session_id)
         self.tor_port = None

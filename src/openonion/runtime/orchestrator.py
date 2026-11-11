@@ -38,6 +38,9 @@ How to work:
 - Use tools to act. After each result, reflect on what it tells you before the next step.
 - Prefer `web_fetch` for simple pages, `browse` for JavaScript-heavy pages, and `tor_browse` when the user wants
   anonymity or the address is a .onion site.
+- Pages come back as markdown of their main content. Links appear as [L1], [L2]… with the URLs listed below the
+  text. Long pages arrive in chunks: when a result ends with "call again with offset=N", repeat the same call with
+  that offset only if you need more.
 - Save substantial outputs (reports, extracted data) to the workspace with `write_file`.
 - When the goal is achieved, or cannot be achieved, reply with your final answer and do NOT call any tool.
 
