@@ -45,6 +45,8 @@ class CreateSession(BaseModel):
 
 class StartRun(BaseModel):
     goal: str = Field(min_length=1, max_length=20_000)
+    policy: SessionPolicy | None = Field(
+        None, description="Optional new policy for this and later runs (e.g. the chat composer's network mode).")
 
 
 class ApprovalDecision(BaseModel):
@@ -111,7 +113,11 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
 
     @app.post("/api/sessions/{session_id}/runs", dependencies=[Depends(auth)], status_code=202)
     async def start_run(session_id: str, body: StartRun):
-        await get_session_or_404(session_id)
+        session = await get_session_or_404(session_id)
+        if body.policy is not None:
+            if manager.is_running(session_id):
+                raise HTTPException(409, "a run is already in progress for this session")
+            await store.update_settings(session_id, {**session["settings"], "policy": body.policy.model_dump()})
         try:
             await manager.start_run(session_id, body.goal)
         except SessionBusy as exc:
@@ -220,6 +226,13 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
 
     _brand_files = {"favicon.svg": "image/svg+xml", "favicon.ico": "image/x-icon",
                     "apple-touch-icon.png": "image/png"}
+
+    @app.get("/fonts/{name}", include_in_schema=False)
+    async def font(name: str):
+        if name != "manrope-latin-wght.woff2":
+            raise HTTPException(404)
+        data = resources.files("openonion.web").joinpath("fonts", name).read_bytes()
+        return Response(data, media_type="font/woff2", headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
     @app.get("/{name}", include_in_schema=False)
     async def brand_asset(name: str):

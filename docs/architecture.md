@@ -25,7 +25,7 @@
 | `memory/store.py` | SQLAlchemy async store (SQLite or Postgres): sessions, events, artifacts |
 | `events.py` | Event types and the in-process fan-out bus |
 | `api/app.py` | REST, SSE with replay and gap backfill, export, artifact serving, optional bearer auth |
-| `web/index.html` | Dependency-free UI: timeline, plan panel, approvals, screenshots |
+| `web/index.html` | Dependency-free chat UI. It renders each conversation from the event log: messages, a working card per reply (plan, steps, screenshots), and inline approvals |
 
 ## Event flow
 

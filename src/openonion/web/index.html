@@ -2,289 +2,727 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OpenOnion</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#2b1b6b">
+<meta name="theme-color" content="#15102a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f5fc" media="(prefers-color-scheme: light)">
 <style>
+  /* Manrope ships with the app: a self-hosted, private agent should not phone Google Fonts. */
+  @font-face {
+    font-family: "Manrope"; src: url("/fonts/manrope-latin-wght.woff2") format("woff2");
+    font-weight: 200 800; font-style: normal; font-display: swap;
+  }
   :root {
-    --bg: #f6f5f8; --panel: #ffffff; --ink: #1d1a22; --muted: #6f6878; --line: #e4e0ea;
-    --accent: #6b3fa0; --accent-ink: #ffffff; --accent-soft: #efe7f8;
-    --ok: #1f7a4d; --ok-soft: #e3f3ea; --bad: #b3261e; --bad-soft: #fbe7e5;
-    --warn: #8a5a00; --warn-soft: #fff2d6; --tor: #4a2a73; --code: #f1eef5;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --bg: #f7f5fc; --raised: #ffffff; --sunk: #efebf8; --line: #e2dcf0; --line-strong: #cdc4e4;
+    --ink: #1d1640; --ink-2: #4a4268; --muted: #776f93;
+    --violet: #6b3fa0; --violet-ink: #ffffff; --violet-soft: #ece4f8;
+    --core: #e8912a; --core-glow: rgba(255, 179, 71, .55);
+    --ok: #227a52; --bad: #b3261e; --bad-soft: #fbeceb; --ask-line: #e9c58f; --ask-bg: #fff8ec;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --col: 720px;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #121016; --panel: #1b1820; --ink: #ebe7f0; --muted: #9a92a6; --line: #2d2834;
-      --accent: #a77ee0; --accent-ink: #120e17; --accent-soft: #2a2036;
-      --ok: #5fc58f; --ok-soft: #16281f; --bad: #f08a80; --bad-soft: #2e1918;
-      --warn: #e7b85a; --warn-soft: #2c2312; --tor: #c9a8f2; --code: #221e28;
+    :root {
+      --bg: #15102a; --raised: #1e1838; --sunk: #110d22; --line: #2c2550; --line-strong: #3d3468;
+      --ink: #ece8f7; --ink-2: #c9c2e3; --muted: #9b93bb;
+      --violet: #8b5cf6; --violet-ink: #ffffff; --violet-soft: #2a2152;
+      --core: #ffb347; --core-glow: rgba(255, 179, 71, .45);
+      --ok: #6fd3a0; --bad: #f2948b; --bad-soft: #3a1c26; --ask-line: #8a6a3a; --ask-bg: #2a2130;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line);
-           background: var(--panel); position: sticky; top: 0; z-index: 5; }
-  header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; font-weight: 600; }
-  .brand { display: flex; align-items: center; gap: 8px; }
-  .brand b { color: var(--accent); font-weight: 600; }
-  header .meta { color: var(--muted); font-size: 12px; margin-left: auto; text-align: right; }
-  .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px; min-height: calc(100vh - 53px); }
-  aside, .side { background: var(--panel); border-right: 1px solid var(--line); padding: 14px; overflow-y: auto; }
-  .side { border-right: 0; border-left: 1px solid var(--line); }
-  main { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 6px 0 8px; }
-  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
-  textarea, input, select { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
-    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-  textarea { resize: vertical; min-height: 84px; }
-  .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); margin-top: 8px; }
-  .check input { width: auto; }
-  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
-           border-radius: 8px; padding: 7px 12px; cursor: pointer; }
-  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  button.danger { color: var(--bad); }
-  button:disabled { opacity: .5; cursor: default; }
-  .row { display: flex; gap: 8px; align-items: center; }
-  .sessions { list-style: none; padding: 0; margin: 0; }
-  .sessions li { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
-  .sessions li:hover { background: var(--accent-soft); }
-  .sessions li.active { background: var(--accent-soft); font-weight: 600; }
-  .sessions .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pill { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--code); color: var(--muted); white-space: nowrap; }
-  .pill.running { background: var(--warn-soft); color: var(--warn); }
-  .pill.completed { background: var(--ok-soft); color: var(--ok); }
-  .pill.failed, .pill.cancelled { background: var(--bad-soft); color: var(--bad); }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .card .head { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
-  .card .head b { color: var(--ink); font-weight: 600; }
-  .card.assistant { border-left: 3px solid var(--accent); }
-  .card.ok { border-left: 3px solid var(--ok); }
-  .card.err { border-left: 3px solid var(--bad); }
-  .card.approval { border: 1px solid var(--warn); background: var(--warn-soft); }
-  .card.final { border: 1px solid var(--ok); }
-  .card.goal { background: var(--accent-soft); border-color: transparent; }
-  .body { margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
-  pre { margin: 6px 0 0; padding: 8px 10px; background: var(--code); border-radius: 8px; font: 12px/1.45 var(--mono);
-        white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; }
-  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 4px; }
-  .shot { margin-top: 8px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
-  .tor { color: var(--tor); font-weight: 600; }
-  .plan { list-style: none; padding: 0; margin: 0; }
-  .plan li { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
-  .plan .ic { width: 18px; text-align: center; flex: none; }
-  .plan .done { color: var(--muted); text-decoration: line-through; }
-  .stats { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
-  .composer { position: sticky; bottom: 0; background: var(--bg); padding-top: 8px; margin-top: auto; }
-  .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
-  .muted { color: var(--muted); font-size: 12px; }
-  @media (max-width: 1000px) {
-    .layout { grid-template-columns: 1fr; }
-    aside, .side { border: 0; border-bottom: 1px solid var(--line); }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sans);
+         -webkit-font-smoothing: antialiased; }
+  button, textarea, select, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; border-radius: 8px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ── shell ───────────────────────────────────────────────────────────── */
+  .app { display: grid; grid-template-columns: 264px minmax(0, 1fr); height: 100%; }
+  .scrim { display: none; }
+  .side { display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; border-right: 1px solid var(--line);
+          background: var(--sunk); min-height: 0; }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 14px; font-weight: 700; font-size: 16px;
+           letter-spacing: -.01em; }
+  .brand img { width: 24px; height: 24px; }
+  .brand span b { color: var(--violet); font-weight: 700; }
+  .new { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; border-radius: 10px;
+         border: 1px solid var(--line-strong); background: var(--raised); font-weight: 600; font-size: 14px; }
+  .new:hover { border-color: var(--violet); }
+  .new svg { width: 16px; height: 16px; }
+  .group { margin: 16px 10px 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .convos { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
+  .convos a { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; color: var(--ink-2);
+              text-decoration: none; font-size: 14px; }
+  .convos a:hover { background: var(--violet-soft); color: var(--ink); }
+  .convos a[aria-current="page"] { background: var(--violet-soft); color: var(--ink); font-weight: 600; }
+  .convos .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .convos .live { width: 7px; height: 7px; border-radius: 50%; background: var(--core); flex: none;
+                  box-shadow: 0 0 0 0 var(--core-glow); animation: ping 1.6s ease-out infinite; }
+  .side-foot { padding: 10px; font-size: 12.5px; color: var(--muted); line-height: 1.45; border-top: 1px solid var(--line); }
+  .side-foot strong { color: var(--ink-2); font-weight: 600; }
+
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+  .topbar { display: none; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .icon-btn { border: 0; background: transparent; padding: 6px; border-radius: 8px; display: inline-flex; }
+  .icon-btn:hover { background: var(--violet-soft); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .scroll { flex: 1; overflow-y: auto; min-height: 0; scroll-behavior: smooth; }
+  .thread { max-width: var(--col); margin: 0 auto; padding: 32px 20px 24px; display: flex; flex-direction: column; gap: 28px; }
+
+  /* ── empty state ─────────────────────────────────────────────────────── */
+  .hello { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+           padding: 24px 20px 8vh; text-align: center; }
+  .hello .mark { width: 76px; height: 76px; position: relative; margin-bottom: 22px; }
+  .hello .mark img { width: 100%; height: 100%; position: relative; }
+  .hello .mark::before { content: ""; position: absolute; inset: 14%; border-radius: 50%;
+                         background: radial-gradient(circle, var(--core-glow), transparent 70%); filter: blur(10px);
+                         animation: rise 1.4s ease-out both; }
+  .hello h1 { font-size: clamp(26px, 3.4vw, 34px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 8px; font-weight: 700; }
+  .hello p { margin: 0 0 26px; color: var(--muted); max-width: 46ch; }
+  .hello .composer-wrap { width: 100%; max-width: var(--col); padding: 0; }
+  .ideas { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; max-width: var(--col); }
+  .ideas button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 7px 14px;
+                  font-size: 13.5px; color: var(--ink-2); }
+  .ideas button:hover { border-color: var(--violet); color: var(--ink); }
+
+  /* ── messages ────────────────────────────────────────────────────────── */
+  .you { align-self: flex-end; max-width: min(85%, 560px); background: var(--violet-soft); border-radius: 18px 18px 6px 18px;
+         padding: 10px 16px; white-space: pre-wrap; word-break: break-word; }
+  .agent { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 0 14px; }
+  .avatar { width: 30px; height: 30px; position: relative; margin-top: 1px; }
+  .avatar img { width: 100%; height: 100%; position: relative; }
+  .avatar::before { content: ""; position: absolute; inset: 18%; border-radius: 50%; opacity: 0;
+                    background: radial-gradient(circle, var(--core-glow), transparent 72%); filter: blur(5px); }
+  .agent.busy .avatar::before { opacity: 1; animation: breathe 1.8s ease-in-out infinite; }
+  .agent-body { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+
+  .status { display: flex; align-items: center; gap: 10px; min-height: 30px; color: var(--ink-2); font-size: 14.5px; }
+  .status .shimmer { background: linear-gradient(90deg, var(--muted) 0%, var(--ink) 45%, var(--muted) 90%);
+                     background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+                     animation: shimmer 2.2s linear infinite; }
+
+  /* The working card: the agent's plan, actions and evidence for one reply. */
+  .work { border: 1px solid var(--line); border-radius: 14px; background: var(--raised); overflow: hidden; }
+  .work > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer;
+                    font-size: 14px; color: var(--ink-2); }
+  .work > summary::-webkit-details-marker { display: none; }
+  .work > summary .chev { width: 16px; height: 16px; transition: transform .18s ease; color: var(--muted); }
+  .work[open] > summary .chev { transform: rotate(90deg); }
+  .work > summary .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .work > summary .tor-pill { font-size: 12px; font-weight: 600; color: var(--violet); background: var(--violet-soft);
+                              border-radius: 999px; padding: 1px 9px; flex: none; }
+  .stop { border: 1px solid var(--line-strong); background: transparent; border-radius: 8px; padding: 3px 10px;
+          font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .stop:hover { border-color: var(--bad); color: var(--bad); }
+  .stop svg { width: 10px; height: 10px; }
+  .work-body { border-top: 1px solid var(--line); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .plan { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+  .plan li { display: flex; gap: 10px; align-items: flex-start; color: var(--ink-2); }
+  .plan .box { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line-strong); flex: none; margin-top: 3px;
+               display: grid; place-items: center; }
+  .plan .done .box { background: var(--violet); border-color: var(--violet); }
+  .plan .done .box::after { content: ""; width: 7px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0;
+                            transform: rotate(-45deg) translate(1px, -1px); }
+  .plan .done span { color: var(--muted); }
+  .plan .in_progress .box { border-color: var(--core); box-shadow: 0 0 0 3px var(--core-glow); }
+  .plan .failed .box { border-color: var(--bad); }
+  .steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .step { border-left: 2px solid var(--line); padding: 2px 0 10px 14px; position: relative; font-size: 14px; }
+  .step:last-child { padding-bottom: 0; }
+  .step::before { content: ""; position: absolute; left: -5px; top: 9px; width: 8px; height: 8px; border-radius: 50%;
+                  background: var(--line-strong); }
+  .step.ok::before { background: var(--violet); }
+  .step.err::before, .step.blocked::before { background: var(--bad); }
+  .step.run::before { background: var(--core); box-shadow: 0 0 0 0 var(--core-glow); animation: ping 1.4s ease-out infinite; }
+  .step .line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .step .what { color: var(--ink); font-weight: 600; }
+  .step .note { color: var(--muted); font-size: 13px; }
+  .step.err .note, .step.blocked .note { color: var(--bad); }
+  .step .say { color: var(--ink-2); margin: 0 0 2px; }
+  .step details summary { cursor: pointer; color: var(--muted); font-size: 13px; width: fit-content; }
+  .step pre, .ask pre { margin: 6px 0 0; padding: 10px 12px; background: var(--sunk); border-radius: 10px; font: 12.5px/1.5 var(--mono);
+                        white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; color: var(--ink-2); }
+  .shots { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .shots a { display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  .shots img { display: block; width: 220px; max-width: 100%; height: auto; }
+
+  /* Approval: the agent asks in the conversation. */
+  .ask { border: 1px solid var(--ask-line); background: var(--ask-bg); border-radius: 14px; padding: 12px 14px; }
+  .ask p { margin: 0; font-weight: 600; }
+  .ask .why { font-weight: 400; color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .ask .acts { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { border-radius: 9px; padding: 7px 14px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-strong);
+         background: var(--raised); }
+  .btn.primary { background: var(--violet); border-color: var(--violet); color: var(--violet-ink); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .ask .verdict { margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+  .ask .verdict summary { cursor: pointer; width: fit-content; }
+
+  /* Answer prose */
+  .answer { line-height: 1.68; overflow-wrap: anywhere; }
+  .answer > :first-child { margin-top: 0; }
+  .answer > :last-child { margin-bottom: 0; }
+  .answer p, .answer ul, .answer ol, .answer pre, .answer blockquote { margin: 0 0 12px; }
+  .answer h2, .answer h3, .answer h4 { margin: 20px 0 8px; line-height: 1.3; letter-spacing: -.01em; }
+  .answer h2 { font-size: 19px; } .answer h3 { font-size: 17px; } .answer h4 { font-size: 15.5px; }
+  .answer ul, .answer ol { padding-left: 22px; }
+  .answer li { margin: 3px 0; }
+  .answer a { color: var(--violet); text-underline-offset: 2px; }
+  .answer code { font: 13px var(--mono); background: var(--sunk); padding: 1px 6px; border-radius: 6px; }
+  .answer pre { background: var(--sunk); padding: 12px 14px; border-radius: 12px; overflow-x: auto; }
+  .answer pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+  .answer blockquote { border-left: 3px solid var(--line-strong); padding-left: 12px; color: var(--ink-2); }
+  .ended { font-size: 14px; color: var(--bad); background: var(--bad-soft); border-radius: 10px; padding: 8px 12px; }
+  .ended.soft { color: var(--muted); background: var(--sunk); }
+
+  /* ── composer ────────────────────────────────────────────────────────── */
+  .composer-wrap { padding: 0 20px 18px; }
+  .composer-dock { max-width: var(--col); margin: 0 auto; width: 100%; }
+  .composer { border: 1px solid var(--line-strong); background: var(--raised); border-radius: 18px; padding: 10px 10px 8px 16px;
+              transition: border-color .15s, box-shadow .15s; text-align: left; }
+  .composer:focus-within { border-color: var(--violet); box-shadow: 0 0 0 4px var(--violet-soft); }
+  .composer textarea { width: 100%; border: 0; outline: 0; resize: none; background: transparent; padding: 4px 0 6px;
+                       max-height: 220px; line-height: 1.5; font-size: 15px; display: block; }
+  .composer textarea::placeholder { color: var(--muted); }
+  .bar { display: flex; align-items: center; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border: 1px solid var(--line); background: transparent;
+          border-radius: 999px; padding: 4px 11px; font-size: 13px; color: var(--ink-2); position: relative; }
+  .chip:hover { border-color: var(--line-strong); color: var(--ink); }
+  .chip svg { width: 14px; height: 14px; }
+  .chip select { appearance: none; border: 0; background: transparent; padding: 0 14px 0 0; font-size: 13px; cursor: pointer;
+                 color: inherit; }
+  .chip select option { color: #1d1640; }
+  .chip .caret { position: absolute; right: 10px; pointer-events: none; width: 10px; height: 10px; }
+  .chip[aria-pressed="true"] { border-color: var(--violet); color: var(--violet); background: var(--violet-soft); }
+  .bar .spacer { flex: 1; }
+  .send { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--violet); color: #fff;
+          display: grid; place-items: center; flex: none; }
+  .send:disabled { background: var(--line-strong); cursor: default; }
+  .send svg { width: 17px; height: 17px; }
+  .send.stopping { background: var(--ink); color: var(--bg); }
+  .hint { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 var(--core-glow); } 80%, 100% { box-shadow: 0 0 0 7px transparent; } }
+  @keyframes breathe { 0%, 100% { transform: scale(.85); opacity: .55; } 50% { transform: scale(1.35); opacity: 1; } }
+  @keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+  @keyframes rise { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    .status .shimmer { color: var(--ink-2); background: none; }
+  }
+
+  /* ── small screens ───────────────────────────────────────────────────── */
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: fixed; inset: 0 auto 0 0; width: 284px; z-index: 20; transform: translateX(-100%);
+            transition: transform .2s ease; box-shadow: 0 0 40px rgba(0,0,0,.25); }
+    .app.nav-open .side { transform: none; }
+    .scrim { display: none; position: fixed; inset: 0; background: rgba(10, 6, 24, .45); z-index: 15; }
+    .app.nav-open .scrim { display: block; }
+    .topbar { display: flex; }
+    .thread { padding: 20px 14px; gap: 22px; }
+    .composer-wrap { padding: 0 10px 10px; }
+    .agent { grid-template-columns: 1fr; }
+    .avatar { display: none; }
+    .hint { display: none; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1 class="brand"><img src="/favicon.svg" alt="" width="26" height="26"><span>Open<b>Onion</b></span></h1>
-  <span class="pill" id="health">connecting…</span>
-  <div class="meta" id="meta"></div>
-</header>
+<div class="app" id="app">
+  <div class="scrim" id="scrim"></div>
+  <nav class="side" aria-label="Conversations">
+    <div class="brand"><img src="/favicon.svg" alt=""><span>Open<b>Onion</b></span></div>
+    <button class="new" id="newChat" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </button>
+    <div id="convoGroups" class="convos"></div>
+    <div class="side-foot" id="sideFoot">Connecting…</div>
+  </nav>
 
-<div class="layout">
-  <aside>
-    <h2>New session</h2>
-    <form id="newForm">
-      <label for="goal">Goal</label>
-      <textarea id="goal" required placeholder="e.g. Visit the Tor Project's onion site and summarize what's new"></textarea>
-      <label for="network">Network</label>
-      <select id="network">
-        <option value="both">Clearnet + Tor</option>
-        <option value="tor">Tor only</option>
-        <option value="clearnet">Clearnet only</option>
-        <option value="off">Offline (no network tools)</option>
-      </select>
-      <div class="check"><input type="checkbox" id="approveWrites" checked><label for="approveWrites" style="margin:0;color:inherit">Ask before writing files / running shell</label></div>
-      <div class="check"><input type="checkbox" id="js" checked><label for="js" style="margin:0;color:inherit">Allow JavaScript in browsers</label></div>
-      <div class="row" style="margin-top:12px"><button class="primary" type="submit" style="flex:1">Start</button></div>
-    </form>
-    <h2 style="margin-top:22px">Sessions</h2>
-    <ul class="sessions" id="sessions"></ul>
-  </aside>
+  <main class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="openNav" type="button" aria-label="Open conversations">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <div class="brand" style="padding:0"><img src="/favicon.svg" alt=""><span>Open<b>Onion</b></span></div>
+    </div>
 
-  <main id="main">
-    <div class="empty" id="empty">Start a session or pick one on the left.<br><span class="muted">Every thought, tool call and result streams here live and is saved to the event log.</span></div>
-    <div id="timeline" style="display:flex;flex-direction:column;gap:10px"></div>
-    <div class="composer" id="composer" hidden>
-      <div class="row">
-        <input id="followup" placeholder="Follow-up goal for this session…">
-        <button class="primary" id="sendFollowup">Run</button>
-        <button class="danger" id="cancelBtn">Stop</button>
+    <section class="hello" id="hello">
+      <div class="mark"><img src="/favicon.svg" alt=""></div>
+      <h1>What should we work on?</h1>
+      <p>Ask anything. When a task needs the web or your workspace, OpenOnion shows each step as it works, and asks before it changes anything.</p>
+      <div class="composer-wrap" id="helloDock"></div>
+      <div class="ideas" id="ideas">
+        <button type="button">Summarize what's new on the Tor Project's site, over Tor</button>
+        <button type="button">Read example.com and list every link on it</button>
+        <button type="button">Write a 3-bullet brief on onion routing to brief.md</button>
+        <button type="button">What can you do?</button>
       </div>
-    </div>
-  </main>
+    </section>
 
-  <section class="side">
-    <h2>Plan</h2>
-    <ul class="plan" id="plan"><li class="muted">No plan yet.</li></ul>
-    <h2 style="margin-top:20px">Run</h2>
-    <div class="stats" id="stats"><span>—</span><span></span></div>
-    <h2 style="margin-top:20px">Session</h2>
-    <div class="row" style="flex-wrap:wrap">
-      <button id="exportBtn" disabled>Export log</button>
+    <div class="scroll" id="scroll" hidden>
+      <div class="thread" id="thread" aria-live="polite"></div>
     </div>
-    <p class="muted" id="policyNote"></p>
-  </section>
+
+    <div class="composer-wrap" id="bottomDock" hidden></div>
+  </main>
 </div>
+
+<template id="composerTpl">
+  <div class="composer-dock">
+    <form class="composer" id="composer">
+      <label class="sr" for="input">Message OpenOnion</label>
+      <textarea id="input" rows="1" placeholder="Message OpenOnion"></textarea>
+      <div class="bar">
+        <span class="chip" title="Which network the agent may use">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9M12 3C9.5 5.6 8.2 8.6 8.2 12s1.3 6.4 3.8 9"/></svg>
+          <label class="sr" for="network">Network</label>
+          <select id="network">
+            <option value="both">Web and Tor</option>
+            <option value="tor">Tor only</option>
+            <option value="clearnet">Web only</option>
+            <option value="off">Offline</option>
+          </select>
+          <svg class="caret" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
+        </span>
+        <button class="chip" type="button" id="askChip" aria-pressed="true" title="Ask before writing files or running commands">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.4 7.9 8 9 4.6-1.1 8-4.6 8-9V6l-8-3Z"/></svg>
+          Ask before changes
+        </button>
+        <span class="spacer"></span>
+        <button class="send" id="send" type="submit" aria-label="Send" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+        </button>
+      </div>
+    </form>
+    <div class="hint">Enter to send, Shift+Enter for a new line. Everything the agent does is saved to this conversation's log.</div>
+  </div>
+</template>
 
 <script>
 const $ = (id) => document.getElementById(id);
+const ICON = {
+  chev: '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg>',
+  stop: '<svg viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="currentColor"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>',
+  square: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>',
+};
+
 let token = "";
 try { token = localStorage.getItem("openonion_token") || ""; } catch (_) {}
-let current = null, source = null, stats = {};
+const state = { current: null, source: null, running: false, turn: null, turns: [], sessions: [] };
 
-function headers() { return token ? { Authorization: "Bearer " + token } : {}; }
+/* ── api ─────────────────────────────────────────────────────────────── */
 async function api(path, opts = {}) {
-  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...headers(), ...(opts.headers || {}) } });
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) };
+  const res = await fetch(path, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
   if (res.status === 401) {
-    token = prompt("API token") || "";
+    token = prompt("This OpenOnion server needs its API token") || "";
     try { localStorage.setItem("openonion_token", token); } catch (_) {}
-    return api(path, opts);
+    if (token) return api(path, opts);
   }
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
   return res.json();
 }
-function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
-function el(html) { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; }
-function art(url) { return token ? url + "?token=" + encodeURIComponent(token) : url; }
+const withToken = (url) => token ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token) : url;
 
-async function health() {
-  try {
-    const h = await api("/api/health");
-    $("health").textContent = "online"; $("health").className = "pill completed";
-    $("meta").innerHTML = `${esc(h.provider)} · ${esc(h.model || "no model set")}<br>${h.tor_slots} Tor slots · shell ${h.shell_enabled ? "on" : "off"}`;
-  } catch (e) { $("health").textContent = "offline"; $("health").className = "pill failed"; }
+/* ── helpers ─────────────────────────────────────────────────────────── */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
+function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (_) { return u || "the page"; } }
+function shortPath(p) { return (p || ".") === "." ? "the workspace" : p; }
+function secs(ms) { const s = Math.max(1, Math.round(ms / 1000)); return s < 60 ? `${s} second${s === 1 ? "" : "s"}` : `${Math.floor(s / 60)} min ${s % 60} s`; }
+
+// Plain-language name for what a tool call is doing, in present and past tense.
+function describe(tool, a = {}) {
+  switch (tool) {
+    case "web_fetch": return ["Reading " + host(a.url), "Read " + host(a.url)];
+    case "browse": return ["Opening " + host(a.url), "Opened " + host(a.url)];
+    case "tor_browse": return ["Browsing " + host(a.url) + " over Tor", "Browsed " + host(a.url) + " over Tor"];
+    case "tor_new_identity": return ["Switching to fresh Tor circuits", "Switched to fresh Tor circuits"];
+    case "read_file": return ["Reading " + shortPath(a.path), "Read " + shortPath(a.path)];
+    case "write_file": return ["Writing " + shortPath(a.path), "Wrote " + shortPath(a.path)];
+    case "list_files": return ["Looking through " + shortPath(a.path), "Looked through " + shortPath(a.path)];
+    case "run_shell": return ["Running a command", "Ran a command"];
+    default: return ["Using " + tool, "Used " + tool];
+  }
 }
-
-async function loadSessions() {
-  const list = await api("/api/sessions");
-  $("sessions").innerHTML = "";
-  for (const s of list) {
-    const li = el(`<li class="${current === s.id ? "active" : ""}"><span class="t">${esc(s.title)}</span><span class="pill ${esc(s.status)}">${esc(s.status)}</span></li>`);
-    li.onclick = () => openSession(s.id);
-    $("sessions").appendChild(li);
+function askLine(tool, a = {}) {
+  switch (tool) {
+    case "write_file": return `Can I write ${a.path || "this file"} in the workspace?`;
+    case "run_shell": return "Can I run this command?";
+    default: return `Can I use ${tool}?`;
   }
 }
 
-function resetView() {
-  $("timeline").innerHTML = ""; $("plan").innerHTML = '<li class="muted">No plan yet.</li>';
-  stats = { steps: 0, tools: 0, tokens: 0, artifacts: 0, status: "—" }; renderStats();
-}
-function renderStats() {
-  $("stats").innerHTML = Object.entries({ Status: stats.status, Steps: stats.steps, "Tool calls": stats.tools,
-    Tokens: stats.tokens.toLocaleString(), Artifacts: stats.artifacts })
-    .map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join("");
+// Small, safe Markdown renderer: escapes everything first, then adds a fixed set of constructs.
+function md(src) {
+  const blocks = [];
+  let text = String(src || "").replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    blocks.push(`<pre><code>${esc(code.replace(/\n$/, ""))}</code></pre>`); return `\u0000${blocks.length - 1}\u0000`;
+  });
+  const inline = (s) => esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+  const out = []; let list = null;
+  const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd();
+    let m;
+    if (/^\u0000\d+\u0000$/.test(line.trim())) { close(); out.push(line.trim()); continue; }
+    if ((m = line.match(/^(#{1,4})\s+(.*)$/))) { close(); const n = Math.min(m[1].length + 1, 4); out.push(`<h${n}>${inline(m[2])}</h${n}>`); continue; }
+    if ((m = line.match(/^\s*[-*+]\s+(.*)$/))) { if (list !== "ul") { close(); out.push("<ul>"); list = "ul"; } out.push(`<li>${inline(m[1])}</li>`); continue; }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (list !== "ol") { close(); out.push("<ol>"); list = "ol"; } out.push(`<li>${inline(m[1])}</li>`); continue; }
+    if ((m = line.match(/^>\s?(.*)$/))) { close(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); continue; }
+    if (!line.trim()) { close(); out.push(""); continue; }
+    close(); out.push(`<p>${inline(line)}</p>`);
+  }
+  close();
+  return out.join("\n").replace(/<\/p>\n<p>/g, "<br>").replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
 }
 
-async function openSession(id) {
-  current = id; if (source) source.close();
-  $("empty").hidden = true; $("composer").hidden = false; $("exportBtn").disabled = false;
-  resetView(); loadSessions();
-  const s = await api(`/api/sessions/${id}`);
-  const p = s.settings.policy || {};
-  $("policyNote").textContent = `Network: ${p.network} · approvals: ${(p.approval_required || []).join(", ") || "none"} · max ${p.max_steps} steps`;
-  const url = `/api/sessions/${id}/stream` + (token ? `?token=${encodeURIComponent(token)}` : "");
-  source = new EventSource(url);
-  source.onmessage = (m) => render(JSON.parse(m.data));
+/* ── composer ────────────────────────────────────────────────────────── */
+const composerNode = document.importNode($("composerTpl").content, true).firstElementChild;
+const input = composerNode.querySelector("#input");
+const send = composerNode.querySelector("#send");
+const network = composerNode.querySelector("#network");
+const askChip = composerNode.querySelector("#askChip");
+try { network.value = localStorage.getItem("openonion_network") || "both"; } catch (_) {}
+try { askChip.setAttribute("aria-pressed", localStorage.getItem("openonion_ask") === "false" ? "false" : "true"); } catch (_) {}
+
+function policy() {
+  return { network: network.value,
+           approval_required: askChip.getAttribute("aria-pressed") === "true" ? ["write_file", "run_shell"] : [] };
+}
+function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 220) + "px"; }
+function syncSend() {
+  if (state.running) {
+    send.disabled = false; send.classList.add("stopping"); send.innerHTML = ICON.square; send.setAttribute("aria-label", "Stop");
+  } else {
+    send.classList.remove("stopping"); send.innerHTML = ICON.send; send.setAttribute("aria-label", "Send");
+    send.disabled = !input.value.trim();
+  }
+}
+input.addEventListener("input", () => { autosize(); syncSend(); });
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!state.running) submit(); }
+});
+network.addEventListener("change", () => { try { localStorage.setItem("openonion_network", network.value); } catch (_) {} });
+askChip.addEventListener("click", () => {
+  const on = askChip.getAttribute("aria-pressed") !== "true";
+  askChip.setAttribute("aria-pressed", String(on));
+  try { localStorage.setItem("openonion_ask", String(on)); } catch (_) {}
+});
+composerNode.querySelector("#composer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (state.running) stopRun(); else submit();
+});
+
+async function submit(textOverride) {
+  const text = (textOverride ?? input.value).trim();
+  if (!text || state.running) return;
+  input.value = ""; autosize(); syncSend();
+  try {
+    if (!state.current) {
+      const s = await api("/api/sessions", { method: "POST", body: JSON.stringify({ title: text.slice(0, 80), policy: policy() }) });
+      await openConversation(s.id, { fresh: true });
+    }
+    state.running = true; syncSend();
+    await api(`/api/sessions/${state.current}/runs`, { method: "POST", body: JSON.stringify({ goal: text, policy: policy() }) });
+    loadSessions();
+  } catch (err) {
+    state.running = false; syncSend();
+    input.value = text; autosize(); syncSend();
+    showError(err.message);
+  }
+}
+async function stopRun() { if (state.current) { try { await api(`/api/sessions/${state.current}/cancel`, { method: "POST" }); } catch (_) {} } }
+function showError(msg) {
+  const node = el(`<div class="ended">Couldn't send that: ${esc(msg)}</div>`);
+  if (state.current) { $("thread").appendChild(node); scrollDown(); } else { $("helloDock").after(node); setTimeout(() => node.remove(), 6000); }
 }
 
-const icons = { done: "✔", in_progress: "▶", failed: "✖", skipped: "–", pending: "○" };
+/* ── layout: empty state vs conversation ─────────────────────────────── */
+function showHello() {
+  $("hello").hidden = false; $("scroll").hidden = true; $("bottomDock").hidden = true;
+  $("helloDock").appendChild(composerNode); input.focus();
+}
+function showThread() {
+  $("hello").hidden = true; $("scroll").hidden = false; $("bottomDock").hidden = false;
+  $("bottomDock").appendChild(composerNode);
+}
+function scrollDown(force) {
+  const s = $("scroll");
+  if (force || s.scrollHeight - s.scrollTop - s.clientHeight < 240) s.scrollTop = s.scrollHeight;
+}
+
+/* ── conversations ───────────────────────────────────────────────────── */
+async function loadSessions() {
+  try { state.sessions = await api("/api/sessions"); } catch (_) { return; }
+  const today = new Date().toDateString();
+  const groups = { Today: [], Earlier: [] };
+  // SQLite hands back naive UTC timestamps; mark them as UTC so "Today" means the viewer's today.
+  const when = (iso) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso || "") ? iso : (iso || "") + "Z");
+  for (const s of state.sessions) groups[when(s.updated_at).toDateString() === today ? "Today" : "Earlier"].push(s);
+  const root = $("convoGroups"); root.innerHTML = "";
+  for (const [name, items] of Object.entries(groups)) {
+    if (!items.length) continue;
+    root.appendChild(el(`<div class="group">${name}</div>`));
+    const ul = el('<ul class="convos"></ul>');
+    for (const s of items) {
+      const li = el(`<li><a href="#/c/${esc(s.id)}" ${s.id === state.current ? 'aria-current="page"' : ""}>
+        <span class="t">${esc(s.title)}</span>${s.status === "running" ? '<span class="live" title="Working"></span>' : ""}</a></li>`);
+      ul.appendChild(li);
+    }
+    root.appendChild(ul);
+  }
+}
+
+async function openConversation(id, { fresh = false } = {}) {
+  if (state.source) state.source.close();
+  state.current = id; state.turn = null; state.turns = []; state.running = false;
+  $("thread").innerHTML = "";
+  if (location.hash !== `#/c/${id}`) history.replaceState(null, "", `#/c/${id}`);
+  showThread(); closeNav(); syncSend();
+  if (!fresh) {
+    try {
+      const s = await api(`/api/sessions/${id}`);
+      const p = (s.settings && s.settings.policy) || {};
+      if (p.network) network.value = p.network;
+      askChip.setAttribute("aria-pressed", String((p.approval_required || []).length > 0));
+      state.running = s.running; syncSend();
+    } catch (err) { showHello(); state.current = null; history.replaceState(null, "", "#"); return; }
+  }
+  state.source = new EventSource(withToken(`/api/sessions/${id}/stream`));
+  state.source.onmessage = (m) => { render(JSON.parse(m.data)); scrollDown(); };
+  loadSessions();
+  setTimeout(() => scrollDown(true), 120);
+  input.focus();
+}
+
+function newChat() {
+  if (state.source) state.source.close();
+  state.current = null; state.running = false; state.turn = null;
+  history.replaceState(null, "", "#"); syncSend(); showHello(); loadSessions(); closeNav();
+}
+
+/* ── turns: one user message + the agent's reply ─────────────────────── */
+function startTurn(ev) {
+  const p = ev.payload;
+  const thread = $("thread");
+  thread.appendChild(el(`<div class="you">${esc(p.goal)}</div>`));
+  const agent = el(`<div class="agent busy">
+      <div class="avatar"><img src="/favicon.svg" alt=""></div>
+      <div class="agent-body">
+        <div class="status" role="status"><span class="shimmer">Thinking</span></div>
+      </div>
+    </div>`);
+  thread.appendChild(agent);
+  const turn = { t0: ev.ts, agent, body: agent.querySelector(".agent-body"), status: agent.querySelector(".status"),
+                 work: null, plan: null, steps: null, calls: {}, args: {}, count: 0, failed: 0, tor: p.policy && p.policy.network === "tor",
+                 usedTor: false, done: false };
+  state.turn = turn; state.turns.push(turn);
+  state.running = true; syncSend();
+  return turn;
+}
+function setStatus(turn, text) {
+  if (turn.done) return;
+  turn.status.innerHTML = `<span class="shimmer">${esc(text)}</span>`;
+  if (turn.work) turn.work.querySelector(".grow").textContent = text;
+}
+function ensureWork(turn) {
+  if (turn.work) return turn.work;
+  const work = el(`<details class="work" open>
+      <summary>${ICON.chev}<span class="grow">Working</span>
+        <button class="stop" type="button">${ICON.stop}Stop</button></summary>
+      <div class="work-body"><ol class="steps"></ol></div>
+    </details>`);
+  work.querySelector(".stop").addEventListener("click", (e) => { e.preventDefault(); stopRun(); });
+  turn.status.after(work);
+  turn.status.hidden = true;
+  turn.work = work; turn.steps = work.querySelector(".steps");
+  return work;
+}
+function addStep(turn, cls, inner, callId) {
+  ensureWork(turn);
+  const li = el(`<li class="step ${cls}">${inner}</li>`);
+  turn.steps.appendChild(li);
+  if (callId) turn.calls[callId] = li;
+  return li;
+}
+
+function finishTurn(turn, ev) {
+  turn.done = true;
+  turn.agent.classList.remove("busy");
+  turn.status.hidden = true;
+  if (turn.work) {
+    const stop = turn.work.querySelector(".stop"); if (stop) stop.remove();
+    const via = turn.usedTor ? `<span class="tor-pill">Tor</span>` : "";
+    const took = secs((ev.ts - turn.t0) * 1000);
+    const missed = turn.failed ? (turn.failed === turn.count ? (turn.count === 1 ? ", which didn't work" : ", none of which worked")
+                                 : `, ${turn.failed} didn't work`) : "";
+    turn.work.querySelector(".grow").textContent =
+      `Worked for ${took} across ${turn.count} step${turn.count === 1 ? "" : "s"}${missed}`;
+    if (via) turn.work.querySelector(".grow").insertAdjacentHTML("afterend", via);
+    turn.work.open = ev.type !== "run_finished";
+  }
+}
+
+/* ── event rendering ─────────────────────────────────────────────────── */
 function render(ev) {
-  const p = ev.payload, tl = $("timeline");
-  const add = (node) => { tl.appendChild(node); node.scrollIntoView({ block: "end", behavior: "smooth" }); };
+  const p = ev.payload;
+  let turn = state.turn;
+  if (ev.type === "run_started") { startTurn(ev); return; }
+  if (!turn) return;
   switch (ev.type) {
-    case "run_started":
-      stats.status = "running"; renderStats();
-      add(el(`<div class="card goal"><div class="head"><b>Goal</b><span>${esc(p.provider)} / ${esc(p.model)} · network: ${esc(p.policy.network)}</span></div><div class="body">${esc(p.goal)}</div></div>`));
-      break;
     case "assistant_message": {
-      stats.steps = p.step; renderStats();
-      const short = (o) => { const s = JSON.stringify(o); return s.length > 220 ? s.slice(0, 220) + "…" : s; };
-      const calls = (p.tool_calls || []).map(tc => `<div class="muted">→ <b class="${tc.name.startsWith("tor") ? "tor" : ""}">${esc(tc.name)}</b> <code>${esc(short(tc.arguments))}</code></div>`).join("");
-      if (!p.text && !calls) break;
-      add(el(`<div class="card assistant"><div class="head"><b>Step ${p.step}</b><span>thinking</span></div>${p.text ? `<div class="body">${esc(p.text)}</div>` : ""}${calls}</div>`));
+      for (const c of p.tool_calls || []) turn.args[c.id] = c.arguments || {};
+      if (p.tool_calls && p.tool_calls.length) {
+        if (p.text && p.text.trim()) {
+          setStatus(turn, p.text.trim().split("\n")[0].slice(0, 140));
+          if (turn.work || p.tool_calls.some(c => c.name !== "update_plan"))
+            addStep(turn, "say", `<p class="say">${esc(p.text.trim())}</p>`);
+        }
+      }
       break;
     }
-    case "plan_updated":
-      $("plan").innerHTML = p.steps.map(s => `<li><span class="ic">${icons[s.status] || "○"}</span><span class="${s.status === "done" ? "done" : ""}">${esc(s.description)}</span></li>`).join("");
+    case "plan_updated": {
+      ensureWork(turn);
+      if (!turn.plan) { turn.plan = el('<ul class="plan" aria-label="Plan"></ul>'); turn.steps.before(turn.plan); }
+      turn.plan.innerHTML = p.steps.map(s =>
+        `<li class="${esc(s.status)}"><span class="box" aria-hidden="true"></span><span>${esc(s.description)}</span></li>`).join("");
+      const now = p.steps.find(s => s.status === "in_progress");
+      if (now) setStatus(turn, now.description);
       break;
-    case "tool_finished": {
-      stats.tools++; renderStats();
+    }
+    case "tool_started": {
       if (p.tool === "update_plan") break;
-      const via = p.data && p.data.via ? ` · <span class="${p.data.via.startsWith("tor") ? "tor" : ""}">${esc(p.data.via)}</span>` : "";
-      const node = el(`<div class="card ${p.ok ? "ok" : "err"}" id="call-${esc(p.call_id)}"><div class="head"><b>${esc(p.tool)}</b><span>${p.ok ? "ok" : "error"} · ${p.duration_ms} ms${via}</span></div><details ${p.ok ? "" : "open"}><summary>result${p.truncated ? " (truncated)" : ""}</summary><pre>${esc(p.preview)}</pre></details></div>`);
-      add(node);
+      const [doing] = describe(p.tool, p.arguments);
+      if (p.tool.startsWith("tor")) turn.usedTor = true;
+      addStep(turn, "run", `<div class="line"><span class="what">${esc(doing)}</span></div>`, p.call_id);
+      setStatus(turn, doing);
+      break;
+    }
+    case "tool_finished": {
+      if (p.tool === "update_plan") break;
+      turn.count++;
+      const li = turn.calls[p.call_id] || addStep(turn, "", "", p.call_id);
+      const [, label] = describe(p.tool, turn.args[p.call_id] || p.arguments || {});
+      li.className = "step " + (p.ok ? "ok" : "err");
+      if (!p.ok) turn.failed++;
+      const took = p.duration_ms < 1000 ? `${p.duration_ms} ms` : `${(p.duration_ms / 1000).toFixed(1)} s`;
+      const note = p.ok ? took : "didn't work";
+      const title = p.data && p.data.title ? `<span class="note">${esc(p.data.title)}</span>` : "";
+      li.innerHTML = `<div class="line"><span class="what">${esc(label)}</span><span class="note">${esc(note)}</span>${p.ok ? title : ""}</div>
+        <details${p.ok ? "" : " open"}><summary>${p.ok ? "Show result" : "Show error"}</summary><pre>${esc(p.preview)}${p.truncated ? "\n…" : ""}</pre></details>`;
+      setStatus(turn, "Thinking");
       break;
     }
     case "artifact_created": {
-      stats.artifacts++; renderStats();
-      const host = document.getElementById("call-" + p.metadata.call_id) || $("timeline").lastElementChild;
-      if (p.mime.startsWith("image/") && host) host.appendChild(el(`<a href="${art(p.url)}" target="_blank" rel="noopener"><img class="shot" src="${art(p.url)}" alt="screenshot of ${esc(p.metadata.url || "")}"></a>`));
+      const li = turn.calls[p.metadata.call_id];
+      if (li && p.mime.startsWith("image/")) {
+        let shots = li.querySelector(".shots");
+        if (!shots) { shots = el('<div class="shots"></div>'); li.appendChild(shots); }
+        const url = withToken(p.url);
+        shots.appendChild(el(`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Screenshot of ${esc(p.metadata.url || "the page")}" loading="lazy"></a>`));
+      }
       break;
     }
-    case "policy_denied":
-      add(el(`<div class="card err"><div class="head"><b>Blocked by policy</b><span>${esc(p.tool)}</span></div><div class="body">${esc(p.reason)}</div></div>`));
+    case "policy_denied": {
+      turn.count++;
+      const [doing] = describe(p.tool, turn.args[p.call_id] || {});
+      turn.failed++;
+      addStep(turn, "blocked", `<div class="line"><span class="what">${esc(doing)}</span><span class="note">Blocked: ${esc(p.reason)}</span></div>`, p.call_id);
       break;
+    }
     case "approval_requested": {
-      const node = el(`<div class="card approval" id="ap-${esc(p.approval_id)}"><div class="head"><b>Approval needed</b><span>${esc(p.tool)}</span></div><pre>${esc(JSON.stringify(p.arguments, null, 2))}</pre><div class="row" style="margin-top:8px"><button class="primary">Approve</button><button class="danger">Deny</button></div></div>`);
-      const [yes, no] = node.querySelectorAll("button");
-      const decide = async (approved) => { yes.disabled = no.disabled = true;
-        try { await api(`/api/sessions/${current}/approvals/${p.approval_id}`, { method: "POST", body: JSON.stringify({ approved }) }); } catch (e) { alert(e.message); } };
+      const ask = el(`<div class="ask" id="ask-${esc(p.approval_id)}">
+          <p>${esc(askLine(p.tool, p.arguments))}</p>
+          <div class="why">Nothing changes until you approve.</div>
+          <pre>${esc(p.tool === "write_file" ? (p.arguments.content || "") : p.tool === "run_shell" ? (p.arguments.command || "") : JSON.stringify(p.arguments, null, 2))}</pre>
+          <div class="acts"><button class="btn primary" type="button">Approve</button><button class="btn" type="button">Deny</button></div>
+        </div>`);
+      const [yes, no] = ask.querySelectorAll("button");
+      const decide = async (approved) => {
+        yes.disabled = no.disabled = true;
+        try { await api(`/api/sessions/${state.current}/approvals/${p.approval_id}`, { method: "POST", body: JSON.stringify({ approved }) }); }
+        catch (err) { yes.disabled = no.disabled = false; alert(err.message); }
+      };
       yes.onclick = () => decide(true); no.onclick = () => decide(false);
-      add(node);
+      (turn.work || turn.status).after(ask);
+      setStatus(turn, "Waiting for your approval");
+      yes.focus({ preventScroll: true });
       break;
     }
     case "approval_resolved": {
-      const n = document.getElementById("ap-" + p.approval_id);
-      if (n) { n.querySelectorAll("button").forEach(b => b.remove()); n.querySelector(".head span").textContent += " · " + p.outcome; }
+      const ask = document.getElementById("ask-" + p.approval_id);
+      if (ask) {
+        ask.querySelector(".acts")?.remove(); ask.querySelector(".why")?.remove();
+        const words = { approved: "You approved this.", denied: "You declined this.", timed_out: "No answer in time, so this was skipped." };
+        const pre = ask.querySelector("pre");
+        const fold = el(`<details class="verdict"><summary>${esc(words[p.outcome] || p.outcome)} Show details</summary></details>`);
+        if (pre) fold.appendChild(pre);
+        ask.appendChild(fold);
+      }
+      setStatus(turn, "Thinking");
       break;
     }
-    case "usage": stats.tokens = p.run_total_tokens; renderStats(); break;
-    case "run_finished":
-      stats.status = "completed"; renderStats();
-      add(el(`<div class="card final"><div class="head"><b>Final answer</b><span>${p.steps} steps · ${p.tool_calls} tool calls</span></div><div class="body">${esc(p.answer)}</div></div>`));
-      loadSessions(); break;
-    case "run_failed": case "run_stopped": case "run_cancelled":
-      stats.status = ev.type.replace("run_", ""); renderStats();
-      add(el(`<div class="card err"><div class="head"><b>${esc(ev.type.replace("_", " "))}</b></div><div class="body">${esc(p.error || p.reason || "")}</div></div>`));
-      loadSessions(); break;
+    case "run_finished": {
+      finishTurn(turn, ev);
+      turn.body.appendChild(el(`<div class="answer">${md(p.answer) || "<p>Done.</p>"}</div>`));
+      endRun(); break;
+    }
+    case "run_failed": case "run_stopped": case "run_cancelled": {
+      finishTurn(turn, ev);
+      const text = ev.type === "run_cancelled" ? "Stopped." :
+                   ev.type === "run_stopped" ? `Stopped early: ${p.reason}.` : `Something went wrong: ${p.error}`;
+      turn.body.appendChild(el(`<div class="ended ${ev.type === "run_cancelled" ? "soft" : ""}">${esc(text)}</div>`));
+      endRun(); break;
+    }
   }
 }
+function endRun() { state.running = false; syncSend(); loadSessions(); }
 
-$("newForm").onsubmit = async (e) => {
-  e.preventDefault();
-  const goal = $("goal").value.trim(); if (!goal) return;
-  const policy = { network: $("network").value, javascript: $("js").checked,
-                   approval_required: $("approveWrites").checked ? ["write_file", "run_shell"] : [] };
+/* ── nav, health, routing ────────────────────────────────────────────── */
+function closeNav() { $("app").classList.remove("nav-open"); }
+$("openNav").onclick = () => $("app").classList.add("nav-open");
+$("scrim").onclick = closeNav;
+$("newChat").onclick = newChat;
+$("ideas").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") submit(e.target.textContent); });
+$("convoGroups").addEventListener("click", (e) => { const a = e.target.closest("a"); if (a) closeNav(); });
+window.addEventListener("hashchange", route);
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); newChat(); }
+  if (e.key === "Escape" && state.running) stopRun();
+});
+
+function route() {
+  const m = location.hash.match(/^#\/c\/([\w-]+)$/);
+  if (m && m[1] !== state.current) openConversation(m[1]);
+  else if (!m && state.current) newChat();
+}
+async function health() {
   try {
-    const s = await api("/api/sessions", { method: "POST", body: JSON.stringify({ title: goal.slice(0, 80), goal, policy }) });
-    $("goal").value = ""; await openSession(s.id);
-  } catch (err) { alert(err.message); }
-};
-$("sendFollowup").onclick = async () => {
-  const goal = $("followup").value.trim(); if (!goal || !current) return;
-  try { await api(`/api/sessions/${current}/runs`, { method: "POST", body: JSON.stringify({ goal }) }); $("followup").value = ""; loadSessions(); }
-  catch (err) { alert(err.message); }
-};
-$("followup").onkeydown = (e) => { if (e.key === "Enter") $("sendFollowup").click(); };
-$("cancelBtn").onclick = async () => { if (current) await api(`/api/sessions/${current}/cancel`, { method: "POST" }); };
-$("exportBtn").onclick = () => { if (current) window.open(art(`/api/sessions/${current}/export`)); };
+    const h = await api("/api/health");
+    $("sideFoot").innerHTML = `<strong>${esc(h.model || "No model set")}</strong><br>${h.tor_slots} private Tor ${h.tor_slots === 1 ? "circuit" : "circuits"} available`;
+  } catch (_) { $("sideFoot").textContent = "Can't reach the OpenOnion server."; }
+}
 
-health(); loadSessions();
+health(); loadSessions(); syncSend();
+if (/^#\/c\//.test(location.hash)) route(); else showHello();
 </script>
 </body>
 </html>

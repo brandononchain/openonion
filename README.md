@@ -49,10 +49,10 @@ no lock-in, and no closed infrastructure. Swap the model, the database, or the t
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/screenshot-dark.png">
     <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshot-light.png">
-    <img alt="The OpenOnion web UI: a session timeline with the agent's steps, a live plan panel, and an approval card for a write_file call" src=".github/assets/screenshot-dark.png" width="92%">
+    <img alt="An OpenOnion conversation: the agent shows its plan and steps in a working card, then asks in the chat before writing brief.md" src=".github/assets/screenshot-dark.png" width="92%">
   </picture>
   <br>
-  <sub>The built-in UI: live timeline, visible plan, run budget, and a human approval gate before the agent writes a file.</sub>
+  <sub>Talk to it like a chat. When a request needs tools, the agent shows its plan and each step as it works, and asks before it changes anything.</sub>
 </div>
 
 ## ✨ Highlights
@@ -262,7 +262,7 @@ openonion/
 │   ├── browser/        # Playwright service + Tor port pool & control client
 │   ├── memory/         # async SQLAlchemy store (SQLite / Postgres)
 │   ├── api/            # FastAPI app: REST, SSE replay, export, auth
-│   ├── web/            # dependency-free single-file UI + favicons
+│   ├── web/            # dependency-free chat UI, favicons, bundled font
 │   ├── policy.py       # SessionPolicy + PolicyEngine
 │   ├── events.py       # event types + fan-out bus
 │   └── cli.py          # `openonion` command

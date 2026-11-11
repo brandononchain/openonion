@@ -13,8 +13,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   the DOM, which closes a common prompt-injection channel. Screenshots are taken first and still show the page as rendered.
 - `offset` argument on all page tools: long pages arrive in 12k-character chunks, served from a per-session page
   cache so paging doesn't refetch over Tor.
+- `POST /api/sessions/{id}/runs` accepts an optional `policy`, so each message can carry the composer's settings.
+- Manrope is bundled with the app, so the UI makes no third-party requests.
 
 ### Changed
+- The web UI is now a conversation instead of a control panel. You chat with the agent; when a reply needs tools,
+  a working card shows the plan, each step, screenshots and a Stop button, then folds into a one-line summary.
+  Approvals appear as a question in the chat. Network mode and approvals are chips on the message box, and every
+  conversation keeps its own URL.
+- The agent replies conversationally: greetings and simple questions get a direct answer, and it only plans when a
+  task takes several tool calls. Replies are written in Markdown.
 - Page tools no longer cut text off at 20,000 characters; the agent pages through it instead.
 
 ## [0.1.0] - 2026-11-10
