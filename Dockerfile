@@ -13,9 +13,10 @@ COPY src ./src
 # Chromium + its system libraries must be installed as root.
 # libatomic1: the Node.js runtime bundled with Playwright links against it,
 # and the slim base image doesn't ship it.
+# nodejs/npm and uv: most MCP connectors start with `npx ...` or `uvx ...`.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libatomic1 \
- && pip install ".[postgres,browser]" \
+ && apt-get install -y --no-install-recommends libatomic1 nodejs npm \
+ && pip install uv ".[postgres,browser]" \
  && playwright install --with-deps chromium \
  && rm -rf /var/lib/apt/lists/*
 

@@ -19,6 +19,9 @@
 | `runtime/services.py` | Per-session resources: clearnet browser, Tor browser and Tor slot, created lazily and closed together |
 | `providers/` | `ModelProvider` protocol; OpenAI-compatible and Anthropic adapters; scripted provider for tests and evals |
 | `tools/` | Typed tools (pydantic `Args` → JSON schema) and the registry |
+| `connectors.py` | MCP connections, one long-lived task per server (stdio or Streamable HTTP); tool listing and calls |
+| `tools/toolbox.py` | Picks which tools the model sees each turn: built-ins plus the top-ranked connector tools, and `find_tools` |
+| `settings_store.py` | Settings saved from the UI (`settings.json`, mode 600), applied over the environment |
 | `policy.py` | `SessionPolicy` and `PolicyEngine`: network modes, allowlists, SSRF guards, approval gates |
 | `readable.py` | Browser-to-LLM bridge: main-content extraction, hidden-text removal, markdown rendering, paging |
 | `browser/` | Playwright service with privacy flags; Tor port pool and control-port client |
